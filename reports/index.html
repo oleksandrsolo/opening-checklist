@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Чеклисти відкриття</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --bg:#f6f5f2;--card:#fff;--ink:#1d1c1a;--muted:#6f6b64;--line:#e6e2da;
+  --ok:#2f8a4e;--ok-bg:#e3f2e7;--warn:#b7791f;--warn-bg:#fbf0dc;--bad:#c2412d;--bad-bg:#fbe5e1;
+  --none:#efece6;--accent:#1d1c1a;--accent-ink:#fff;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141413;--card:#1e1d1b;--ink:#efede8;--muted:#a19c93;--line:#2f2d2a;
+  --ok:#5cc07c;--ok-bg:#1f3427;--warn:#e0a548;--warn-bg:#3a2e17;--bad:#ef7a65;--bad-bg:#3d211c;
+  --none:#26241f;--accent:#efede8;--accent-ink:#141413;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1200px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+h1{font-size:20px;margin:0;letter-spacing:-.01em}
+h2{font-size:15px;margin:0 0 10px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input,select,textarea{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:600}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:4px 0 16px;overflow-x:auto}
+.tab{background:none;border:0;padding:9px 12px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab.on{color:var(--ink);border-color:var(--ink);font-weight:600}
+.badge{display:inline-block;min-width:18px;padding:0 6px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;text-align:center;margin-left:4px}
+.grid{display:grid;gap:12px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.kpi .l{color:var(--muted);font-size:12px}
+.two{grid-template-columns:1fr;margin-top:12px}
+@media(min-width:900px){.two{grid-template-columns:3fr 2fr}}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:12px;white-space:nowrap}
+tr.click{cursor:pointer} tr.click:hover td{background:var(--none)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.matrix td,.matrix th{padding:3px;border:0;text-align:center}
+.matrix th.r,.matrix td.r{text-align:left;white-space:nowrap;padding-right:10px;font-size:13px}
+.cell{width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;cursor:default}
+.cell.ok{background:var(--ok-bg);color:var(--ok);cursor:pointer}
+.cell.late{background:var(--warn-bg);color:var(--warn);cursor:pointer}
+.cell.miss{background:var(--bad-bg);color:var(--bad)}
+.cell.wip{background:var(--none);color:var(--muted);cursor:pointer}
+.cell.fut{background:transparent;border:1px dashed var(--line)}
+.legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.late{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.mute{background:var(--none);color:var(--muted)}
+.muted{color:var(--muted)}
+.bar{height:6px;background:var(--none);border-radius:3px;overflow:hidden;margin-top:4px}
+.bar>div{height:100%;background:var(--bad)}
+.thumb{width:84px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;display:block}
+.photos{display:flex;gap:8px;flex-wrap:wrap}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;z-index:10}
+.overlay.on{display:flex}
+.modal{background:var(--card);border-radius:14px;max-width:760px;width:100%;padding:18px}
+.modal h3{margin:0 0 4px}
+.ans{display:grid;grid-template-columns:1fr auto;gap:6px 12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.ans .q{font-weight:500}
+.ans .c{grid-column:1/-1;color:var(--muted)}
+.sec{margin:14px 0 2px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.lightbox img{max-width:100%;max-height:85vh;border-radius:10px}
+.center{min-height:80vh;display:flex;align-items:center;justify-content:center}
+.login{width:100%;max-width:360px;display:grid;gap:10px}
+.err{color:var(--bad);min-height:1.2em}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hidden{display:none!important}
+.switch{cursor:pointer}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- Налаштування підключення -->
+<div id="cfgView" class="center hidden"><div class="card login">
+  <h1>Підключення до Supabase</h1>
+  <p class="muted" style="margin:0">Project Settings → API. Ключ — <b>anon / publishable</b>, не service_role.</p>
+  <input id="cfgUrl" placeholder="https://xxxx.supabase.co">
+  <input id="cfgKey" placeholder="anon key">
+  <button class="btn" id="cfgSave">Зберегти</button>
+</div></div>
+
+<!-- Вхід -->
+<div id="loginView" class="center hidden"><form class="card login" id="loginForm">
+  <h1>Чеклисти відкриття</h1>
+  <input id="email" type="email" placeholder="Email" autocomplete="username" required>
+  <input id="pass" type="password" placeholder="Пароль" autocomplete="current-password" required>
+  <button class="btn">Увійти</button>
+  <div class="err" id="loginErr"></div>
+  <a href="#" id="resetCfg" class="muted" style="font-size:12px">Змінити підключення</a>
+</form></div>
+
+<!-- Панель -->
+<div id="appView" class="wrap hidden">
+  <header>
+    <h1>Чеклисти відкриття</h1>
+    <div class="filters">
+      <input type="date" id="dFrom"> – <input type="date" id="dTo">
+      <select id="fRest"><option value="">Усі ресторани</option></select>
+      <button class="btn ghost" id="refresh">Оновити</button>
+      <button class="btn ghost" id="logout">Вийти</button>
+    </div>
+  </header>
+  <nav class="tabs">
+    <button class="tab on" data-t="overview">Огляд</button>
+    <button class="tab" data-t="reports">Звіти</button>
+    <button class="tab" data-t="problems">Проблеми</button>
+    <button class="tab" data-t="staff">Персонал <span id="pendingBadge"></span></button>
+    <button class="tab" data-t="items">Чеклист</button>
+  </nav>
+
+  <section id="t-overview">
+    <div class="grid kpis" id="kpis"></div>
+    <div class="grid two">
+      <div class="card"><h2>Відкриття по днях</h2><div class="scroll" id="matrix"></div>
+        <div class="legend"><span><i style="background:var(--ok-bg)"></i>вчасно</span><span><i style="background:var(--warn-bg)"></i>із запізненням</span><span><i style="background:var(--bad-bg)"></i>не заповнено</span><span><i style="background:var(--none)"></i>в процесі</span><span>цифра — к-ть проблем</span></div>
+      </div>
+      <div class="card"><h2>Найчастіші проблеми</h2><div id="topProblems"></div></div>
+    </div>
+    <div class="card" style="margin-top:12px"><h2>По ресторанах</h2><div class="scroll" id="byRest"></div></div>
+  </section>
+
+  <section id="t-reports" class="hidden"><div class="card scroll" id="reportsTable"></div></section>
+  <section id="t-problems" class="hidden"><div class="card scroll" id="problemsTable"></div></section>
+  <section id="t-staff" class="hidden"><div class="card scroll" id="staffTable"></div></section>
+  <section id="t-items" class="hidden">
+    <div class="card" style="margin-bottom:12px">
+      <h2>Додати пункт</h2>
+      <form id="itemForm" class="row">
+        <input name="section" placeholder="Розділ (напр. Кухня)" required style="width:150px">
+        <input name="question" placeholder="Питання" required style="flex:1;min-width:220px">
+        <select name="answer_type"><option value="yes_no">Так / Ні</option><option value="number">Число</option><option value="text">Текст</option><option value="photo">Лише фото</option></select>
+        <label class="row" style="gap:4px"><input type="checkbox" name="photo_required"> фото</label>
+        <input name="ok_min" type="number" step="any" placeholder="мін" style="width:70px">
+        <input name="ok_max" type="number" step="any" placeholder="макс" style="width:70px">
+        <select name="restaurant_id"><option value="">Для всіх</option></select>
+        <input name="position" type="number" placeholder="Порядок" style="width:90px">
+        <button class="btn">Додати</button>
+      </form>
+    </div>
+    <div class="card scroll" id="itemsTable"></div>
+  </section>
+</div>
+
+<div class="overlay" id="modal"><div class="modal" id="modalBody"></div></div>
+<div class="overlay lightbox" id="lightbox"><img id="lbImg" alt=""></div>
+
+<script>
+const LS = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { return null; } };
+// config.js генерується при деплої на GitHub Pages; локально — вводиться в браузері
+const CFG = { url: window.CK_CONFIG?.url || LS("ck_url"), key: window.CK_CONFIG?.key || LS("ck_key") };
+const BUCKET = "checklist-photos";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmtD = (d) => d ? d.split("-").reverse().join(".") : "";
+const fmtT = (iso) => iso ? new Date(iso).toLocaleTimeString("uk-UA", { timeZone: "Europe/Kyiv", hour: "2-digit", minute: "2-digit", hour12: false }) : "—";
+const kyivToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv" }).format(new Date());
+const addDays = (d, n) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+const dayRange = (a, b) => { const out = []; for (let d = a; d <= b && out.length < 93; d = addDays(d, 1)) out.push(d); return out; };
+const WD = ["Нд", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+
+let sb, S = { restaurants: [], subs: [], problems: [], staff: [], items: [] };
+
+function show(view) { ["cfgView", "loginView", "appView"].forEach((v) => $("#" + v).classList.toggle("hidden", v !== view)); }
+
+async function boot() {
+  if (!CFG.url || !CFG.key) return show("cfgView");
+  sb = supabase.createClient(CFG.url, CFG.key);
+  const { data } = await sb.auth.getSession();
+  if (!data.session) return show("loginView");
+  show("appView");
+  const t = kyivToday();
+  $("#dTo").value ||= t; $("#dFrom").value ||= addDays(t, -6);
+  await loadAll();
+}
+
+$("#cfgSave").onclick = () => { LS("ck_url", $("#cfgUrl").value.trim().replace(/\/$/, "")); LS("ck_key", $("#cfgKey").value.trim()); location.reload(); };
+$("#resetCfg").onclick = (e) => { e.preventDefault(); LS("ck_url", null); LS("ck_key", null); location.reload(); };
+$("#loginForm").onsubmit = async (e) => {
+  e.preventDefault(); $("#loginErr").textContent = "";
+  const { error } = await sb.auth.signInWithPassword({ email: $("#email").value, password: $("#pass").value });
+  if (error) $("#loginErr").textContent = "Невірний email або пароль"; else boot();
+};
+$("#logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+$("#refresh").onclick = () => loadAll();
+["#dFrom", "#dTo", "#fRest"].forEach((s) => $(s).onchange = () => loadAll());
+document.querySelectorAll(".tab").forEach((b) => b.onclick = () => {
+  document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("on", x === b));
+  document.querySelectorAll("main section, section[id^=t-]").forEach((s) => s.classList.toggle("hidden", s.id !== "t-" + b.dataset.t));
+});
+$("#modal").onclick = (e) => { if (e.target.id === "modal") $("#modal").classList.remove("on"); };
+$("#lightbox").onclick = () => $("#lightbox").classList.remove("on");
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("#modal").classList.remove("on"); $("#lightbox").classList.remove("on"); } });
+
+async function loadAll() {
+  const from = $("#dFrom").value, to = $("#dTo").value, rid = $("#fRest").value;
+  let qs = sb.from("v_submissions").select("*").gte("work_date", from).lte("work_date", to).order("started_at", { ascending: false });
+  let qp = sb.from("answers").select("id,question,section,value_bool,value_number,value_text,comment,photo_path,answered_at,submission_id,submissions!inner(work_date,restaurant_id,staff_name)")
+    .eq("is_problem", true).gte("submissions.work_date", from).lte("submissions.work_date", to).order("answered_at", { ascending: false });
+  if (rid) { qs = qs.eq("restaurant_id", rid); qp = qp.eq("submissions.restaurant_id", rid); }
+  const [r, s, p, st, it] = await Promise.all([
+    sb.from("restaurants").select("*").order("name"), qs, qp,
+    sb.from("staff").select("*").order("created_at", { ascending: false }),
+    sb.from("checklist_items").select("*").order("position").order("id"),
+  ]);
+  const err = [r, s, p, st, it].find((x) => x.error);
+  if (err) { alert("Помилка завантаження: " + err.error.message + "\nПеревір, що твій email додано в dashboard_admins."); return; }
+  S = { restaurants: r.data, subs: s.data, problems: p.data, staff: st.data, items: it.data };
+  fillRestSelects();
+  renderOverview(); renderReports(); renderProblems(); renderStaff(); renderItems();
+}
+
+const restName = (id) => S.restaurants.find((r) => r.id === id)?.name ?? "—";
+function fillRestSelects() {
+  const opts = S.restaurants.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
+  const f = $("#fRest"), cur = f.value; f.innerHTML = `<option value="">Усі ресторани</option>` + opts; f.value = cur;
+  const g = document.querySelector('#itemForm [name=restaurant_id]'); const c2 = g.value; g.innerHTML = `<option value="">Для всіх</option>` + opts; g.value = c2;
+}
+
+// ---------- Огляд ----------
+function renderOverview() {
+  const from = $("#dFrom").value, to = $("#dTo").value, rid = $("#fRest").value, today = kyivToday();
+  const rests = S.restaurants.filter((r) => r.active && (!rid || String(r.id) === rid));
+  const days = dayRange(from, to);
+  const done = S.subs.filter((x) => x.status === "completed");
+  // перше завершене відкриття на ресторан/день
+  const byKey = {};
+  for (const x of [...done].sort((a, b) => a.completed_at.localeCompare(b.completed_at))) byKey[x.restaurant_id + "|" + x.work_date] ||= x;
+  const wip = {};
+  for (const x of S.subs.filter((x) => x.status === "in_progress")) wip[x.restaurant_id + "|" + x.work_date] = x;
+  const firsts = Object.values(byKey);
+  const expected = rests.length * days.filter((d) => d <= today).length;
+  const onTime = firsts.filter((x) => !x.is_late).length;
+  const probs = firsts.reduce((a, x) => a + x.problems_cnt, 0);
+  const dur = firsts.length ? firsts.reduce((a, x) => a + Number(x.duration_min || 0), 0) / firsts.length : 0;
+  const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "—";
+  $("#kpis").innerHTML = [
+    ["Відкриттів заповнено", `${firsts.length}<span class="muted" style="font-size:16px"> / ${expected}</span>`, pct(firsts.length, expected) + " від очікуваних"],
+    ["Вчасно", pct(onTime, firsts.length), `${firsts.length - onTime} із запізненням`],
+    ["Проблем зафіксовано", probs, firsts.length ? (probs / firsts.length).toFixed(1) + " на відкриття" : ""],
+    ["Сер. тривалість", firsts.length ? Math.round(dur) + " хв" : "—", "від старту до завершення"],
+  ].map(([l, v, s]) => `<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="l">${s}</div></div>`).join("");
+
+  // матриця
+  let h = `<table class="matrix"><tr><th class="r"></th>${days.map((d) => { const w = new Date(d + "T12:00:00Z").getUTCDay(); return `<th class="muted" style="font-size:11px">${WD[w]}<br>${d.slice(8)}.${d.slice(5, 7)}</th>`; }).join("")}</tr>`;
+  for (const r of rests) {
+    h += `<tr><td class="r">${esc(r.name)}</td>`;
+    for (const d of days) {
+      const x = byKey[r.id + "|" + d], w = wip[r.id + "|" + d];
+      if (x) h += `<td><div class="cell ${x.is_late ? "late" : "ok"}" data-sub="${x.id}" title="${esc(x.staff_name)} · ${fmtT(x.completed_at)}">${x.problems_cnt || "✓"}</div></td>`;
+      else if (w) h += `<td><div class="cell wip" data-sub="${w.id}" title="В процесі: ${esc(w.staff_name)}">…</div></td>`;
+      else if (d > today) h += `<td><div class="cell fut"></div></td>`;
+      else h += `<td><div class="cell miss" title="Не заповнено">—</div></td>`;
+    }
+    h += "</tr>";
+  }
+  $("#matrix").innerHTML = rests.length ? h + "</table>" : `<div class="empty">Немає ресторанів</div>`;
+  $("#matrix").querySelectorAll("[data-sub]").forEach((el) => el.onclick = () => openSub(el.dataset.sub));
+
+  // топ проблем
+  const cnt = {};
+  for (const p of S.problems) cnt[p.question] = (cnt[p.question] || 0) + 1;
+  const top = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 8), mx = top[0]?.[1] || 1;
+  $("#topProblems").innerHTML = top.length ? top.map(([q, n]) => `<div style="margin-bottom:10px"><div class="row" style="justify-content:space-between"><span>${esc(q)}</span><b>${n}</b></div><div class="bar"><div style="width:${n / mx * 100}%"></div></div></div>`).join("") : `<div class="empty">Проблем немає 🎉</div>`;
+
+  // по ресторанах
+  const elapsed = days.filter((d) => d <= today).length;
+  const rows = rests.map((r) => {
+    const f = firsts.filter((x) => x.restaurant_id === r.id);
+    const ot = f.filter((x) => !x.is_late).length, pr = f.reduce((a, x) => a + x.problems_cnt, 0);
+    const av = f.length ? Math.round(f.reduce((a, x) => a + Number(x.duration_min || 0), 0) / f.length) : null;
+    const cov = elapsed ? f.length / elapsed : 0;
+    return `<tr><td>${esc(r.name)}</td><td class="num">${f.length} / ${elapsed}</td><td class="num"><span class="pill ${cov >= .95 ? "ok" : cov >= .7 ? "late" : "bad"}">${pct(f.length, elapsed)}</span></td><td class="num">${pct(ot, f.length)}</td><td class="num">${pr}</td><td class="num">${av ?? "—"}${av !== null ? " хв" : ""}</td><td class="muted">до ${r.open_time.slice(0, 5)}</td></tr>`;
+  }).join("");
+  $("#byRest").innerHTML = `<table><tr><th>Ресторан</th><th class="num">Заповнено</th><th class="num">Покриття</th><th class="num">Вчасно</th><th class="num">Проблем</th><th class="num">Сер. час</th><th>Дедлайн</th></tr>${rows}</table>`;
+}
+
+// ---------- Звіти ----------
+function renderReports() {
+  if (!S.subs.length) return $("#reportsTable").innerHTML = `<div class="empty">Немає звітів за період</div>`;
+  const st = (x) => x.status === "completed" ? `<span class="pill ${x.is_late ? "late" : "ok"}">${x.is_late ? "запізнення" : "вчасно"}</span>` : x.status === "in_progress" ? `<span class="pill mute">в процесі</span>` : `<span class="pill mute">скасовано</span>`;
+  $("#reportsTable").innerHTML = `<table><tr><th>Дата</th><th>Ресторан</th><th>Працівник</th><th>Старт</th><th>Фініш</th><th class="num">Хв</th><th class="num">Проблем</th><th class="num">Фото</th><th>Статус</th></tr>${
+    S.subs.map((x) => `<tr class="click" data-sub="${x.id}"><td>${fmtD(x.work_date)}</td><td>${esc(x.restaurant)}</td><td>${esc(x.staff_name)}</td><td>${fmtT(x.started_at)}</td><td>${fmtT(x.completed_at)}</td><td class="num">${x.duration_min ?? "—"}</td><td class="num">${x.problems_cnt ? `<span class="pill bad">${x.problems_cnt}</span>` : "0"}</td><td class="num">${x.photos_cnt}</td><td>${st(x)}</td></tr>`).join("")}</table>`;
+  $("#reportsTable").querySelectorAll("[data-sub]").forEach((el) => el.onclick = () => openSub(el.dataset.sub));
+}
+
+async function signed(paths) {
+  paths = paths.filter(Boolean); if (!paths.length) return {};
+  const { data } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
+  return Object.fromEntries((data || []).map((d) => [d.path, d.signedUrl]));
+}
+const valueOf = (a) => a.value_bool === true ? `<span class="pill ok">Так</span>` : a.value_bool === false ? `<span class="pill bad">Ні</span>`
+  : a.value_number !== null && a.value_number !== undefined ? `<b class="${a.is_problem ? "pill bad" : ""}">${a.value_number}</b>` : a.value_text ? esc(a.value_text) : "";
+
+async function openSub(id) {
+  const x = S.subs.find((s) => s.id === id);
+  $("#modalBody").innerHTML = `<div class="empty">Завантаження…</div>`; $("#modal").classList.add("on");
+  const { data: ans, error } = await sb.from("answers").select("*").eq("submission_id", id).order("answered_at");
+  if (error) return $("#modalBody").innerHTML = `<div class="err">${esc(error.message)}</div>`;
+  const urls = await signed(ans.map((a) => a.photo_path));
+  let sec = "", body = "";
+  for (const a of ans) {
+    if (a.section !== sec) { sec = a.section; body += `<div class="sec">${esc(sec)}</div>`; }
+    body += `<div class="ans"><div class="q">${esc(a.question)}</div><div>${valueOf(a)}</div>${a.comment ? `<div class="c">↳ ${esc(a.comment)}</div>` : ""}${a.photo_path && urls[a.photo_path] ? `<div class="c"><img class="thumb" src="${urls[a.photo_path]}" alt=""></div>` : ""}</div>`;
+  }
+  $("#modalBody").innerHTML = `<div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${esc(x?.restaurant ?? "")} · ${fmtD(x?.work_date)}</h3><div class="muted">${esc(x?.staff_name)} · ${fmtT(x?.started_at)}–${fmtT(x?.completed_at)}${x?.duration_min ? ` · ${x.duration_min} хв` : ""} · проблем: ${x?.problems_cnt ?? 0}</div></div><button class="btn ghost" onclick="$('#modal').classList.remove('on')">✕</button></div>${body || `<div class="empty">Відповідей ще немає</div>`}`;
+  bindThumbs($("#modalBody"));
+}
+function bindThumbs(root) { root.querySelectorAll(".thumb").forEach((img) => img.onclick = (e) => { e.stopPropagation(); $("#lbImg").src = img.src; $("#lightbox").classList.add("on"); }); }
+
+// ---------- Проблеми ----------
+async function renderProblems() {
+  if (!S.problems.length) return $("#problemsTable").innerHTML = `<div class="empty">Проблем за період немає 🎉</div>`;
+  const urls = await signed(S.problems.map((p) => p.photo_path));
+  $("#problemsTable").innerHTML = `<table><tr><th>Дата</th><th>Ресторан</th><th>Пункт</th><th>Відповідь</th><th>Коментар</th><th>Фото</th><th>Хто</th></tr>${
+    S.problems.map((p) => `<tr><td>${fmtD(p.submissions.work_date)}<br><span class="muted">${fmtT(p.answered_at)}</span></td><td>${esc(restName(p.submissions.restaurant_id))}</td><td>${esc(p.question)}</td><td>${valueOf(p)}</td><td>${esc(p.comment)}</td><td>${p.photo_path && urls[p.photo_path] ? `<img class="thumb" src="${urls[p.photo_path]}" alt="">` : ""}</td><td>${esc(p.submissions.staff_name)}</td></tr>`).join("")}</table>`;
+  bindThumbs($("#problemsTable"));
+}
+
+// ---------- Персонал ----------
+function renderStaff() {
+  const pending = S.staff.filter((s) => !s.active && s.full_name && s.restaurant_id).length;
+  $("#pendingBadge").innerHTML = pending ? `<span class="badge">${pending}</span>` : "";
+  const ropts = (sel) => S.restaurants.map((r) => `<option value="${r.id}" ${r.id === sel ? "selected" : ""}>${esc(r.name)}</option>`).join("");
+  const list = [...S.staff].sort((a, b) => (a.active - b.active));
+  $("#staffTable").innerHTML = list.length ? `<table><tr><th>Імʼя</th><th>Telegram</th><th>Ресторан</th><th>Зареєстр.</th><th>Доступ</th></tr>${
+    list.map((s) => `<tr><td>${esc(s.full_name || "— (не завершив реєстрацію)")}</td><td class="muted">${s.username ? "@" + esc(s.username) : s.telegram_id}</td><td><select data-rest="${s.telegram_id}"><option value="">—</option>${ropts(s.restaurant_id)}</select></td><td class="muted">${new Date(s.created_at).toLocaleDateString("uk-UA")}</td><td><button class="btn ${s.active ? "ghost" : ""}" data-act="${s.telegram_id}" data-v="${!s.active}">${s.active ? "Вимкнути" : "Підтвердити"}</button></td></tr>`).join("")}</table>`
+    : `<div class="empty">Ще ніхто не зареєструвався. Працівник має написати боту /start.</div>`;
+  $("#staffTable").querySelectorAll("[data-act]").forEach((b) => b.onclick = async () => {
+    const { error } = await sb.from("staff").update({ active: b.dataset.v === "true" }).eq("telegram_id", b.dataset.act);
+    if (error) alert(error.message); else loadAll();
+  });
+  $("#staffTable").querySelectorAll("[data-rest]").forEach((s) => s.onchange = async () => {
+    const { error } = await sb.from("staff").update({ restaurant_id: s.value || null }).eq("telegram_id", s.dataset.rest);
+    if (error) alert(error.message);
+  });
+}
+
+// ---------- Чеклист ----------
+const TYPES = { yes_no: "Так / Ні", number: "Число", text: "Текст", photo: "Лише фото" };
+function renderItems() {
+  const rid = $("#fRest").value;
+  const list = S.items.filter((i) => !rid || !i.restaurant_id || String(i.restaurant_id) === rid);
+  $("#itemsTable").innerHTML = `<table><tr><th class="num">#</th><th>Розділ</th><th>Питання</th><th>Тип</th><th>Фото</th><th>Норма</th><th>Ресторан</th><th>Активний</th><th></th></tr>${
+    list.map((i) => `<tr style="${i.active ? "" : "opacity:.45"}"><td class="num">${i.position}</td><td>${esc(i.section)}</td><td>${esc(i.question)}${i.hint ? `<br><span class="muted">${esc(i.hint)}</span>` : ""}</td><td>${TYPES[i.answer_type]}</td><td>${i.photo_required || i.answer_type === "photo" ? "📷" : ""}</td><td class="muted">${i.ok_min !== null || i.ok_max !== null ? `${i.ok_min ?? "…"} – ${i.ok_max ?? "…"}` : ""}</td><td class="muted">${i.restaurant_id ? esc(restName(i.restaurant_id)) : "усі"}</td><td><input type="checkbox" class="switch" data-tog="${i.id}" ${i.active ? "checked" : ""}></td><td><button class="btn ghost" data-edit="${i.id}">✎</button></td></tr>`).join("")}</table>`;
+  $("#itemsTable").querySelectorAll("[data-tog]").forEach((c) => c.onchange = async () => {
+    const { error } = await sb.from("checklist_items").update({ active: c.checked }).eq("id", c.dataset.tog);
+    if (error) alert(error.message); else loadAll();
+  });
+  $("#itemsTable").querySelectorAll("[data-edit]").forEach((b) => b.onclick = async () => {
+    const i = S.items.find((x) => String(x.id) === b.dataset.edit);
+    const q = prompt("Питання:", i.question); if (q === null) return;
+    const h = prompt("Підказка (до фото тощо):", i.hint ?? ""); if (h === null) return;
+    const p = prompt("Порядок (число):", i.position); if (p === null) return;
+    const { error } = await sb.from("checklist_items").update({ question: q.trim(), hint: h.trim() || null, position: Number(p) || i.position }).eq("id", i.id);
+    if (error) alert(error.message); else loadAll();
+  });
+}
+$("#itemForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target), n = (k) => f.get(k) === "" ? null : Number(f.get(k));
+  const row = { section: f.get("section").trim(), question: f.get("question").trim(), answer_type: f.get("answer_type"),
+    photo_required: f.get("photo_required") === "on", ok_min: n("ok_min"), ok_max: n("ok_max"),
+    restaurant_id: n("restaurant_id"), position: n("position") ?? (Math.max(0, ...S.items.map((i) => i.position)) + 10) };
+  const { error } = await sb.from("checklist_items").insert(row);
+  if (error) alert(error.message); else { e.target.reset(); loadAll(); }
+};
+
+boot();
+</script>
+</body>
+</html>

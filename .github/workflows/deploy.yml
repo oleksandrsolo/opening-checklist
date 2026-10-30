@@ -1,0 +1,75 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  supabase:
+    name: База + бот
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TG_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+      REPORT_CHAT_ID: ${{ secrets.REPORT_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Звʼязати з проєктом
+        run: supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Міграції бази
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Секрети функції
+        run: |
+          args="TELEGRAM_BOT_TOKEN=$TG_TOKEN TELEGRAM_WEBHOOK_SECRET=$TG_SECRET"
+          [ -n "$REPORT_CHAT_ID" ] && args="$args REPORT_CHAT_ID=$REPORT_CHAT_ID"
+          supabase secrets set $args --project-ref "$PROJECT_REF"
+
+      - name: Деплой бота
+        run: supabase functions deploy telegram-bot --no-verify-jwt --project-ref "$PROJECT_REF"
+
+      - name: Вебхук Telegram
+        run: |
+          curl -fsS "https://api.telegram.org/bot${TG_TOKEN}/setWebhook" \
+            -d "url=https://${PROJECT_REF}.supabase.co/functions/v1/telegram-bot" \
+            -d "secret_token=${TG_SECRET}" \
+            -d 'allowed_updates=["message","callback_query"]' | grep -q '"ok":true'
+          echo "Webhook OK"
+
+  pages:
+    name: Панель звітів
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Конфіг панелі
+        env:
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+        run: |
+          printf 'window.CK_CONFIG={url:"https://%s.supabase.co",key:"%s"};\n' "$PROJECT_REF" "$ANON_KEY" > reports/config.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: reports
+      - id: deploy
+        uses: actions/deploy-pages@v4

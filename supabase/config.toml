@@ -1,0 +1,4 @@
+project_id = "opening-checklist"
+
+[functions.telegram-bot]
+verify_jwt = false
