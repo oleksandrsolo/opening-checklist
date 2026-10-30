@@ -94,6 +94,12 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--none)}
 .hidden{display:none!important}
 .switch{cursor:pointer}
 .empty{padding:28px;text-align:center;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:2px;padding:2px 2px 2px 9px;border-radius:12px;background:var(--none);margin:2px 4px 2px 0;font-size:13px;white-space:nowrap}
+.chip button{border:0;background:none;cursor:pointer;color:var(--muted);padding:0 6px;font-size:14px;line-height:1}
+.chip button:hover{color:var(--bad)}
+select.sm{padding:3px 6px;font-size:13px}
+input[type=time]{padding:5px 7px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
 </style>
 </head>
 <body>
@@ -136,7 +142,8 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--none)}
     <button class="tab" data-t="reports">Звіти</button>
     <button class="tab" data-t="problems">Проблеми</button>
     <button class="tab" data-t="staff">Персонал <span id="pendingBadge"></span></button>
-    <button class="tab" data-t="items">Чеклист</button>
+    <button class="tab" data-t="items">Чек-листи</button>
+    <button class="tab" data-t="rests">Ресторани</button>
   </nav>
 
   <section id="t-overview">
@@ -153,7 +160,12 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--none)}
   <section id="t-reports" class="hidden"><div class="card scroll" id="reportsTable"></div></section>
   <section id="t-problems" class="hidden"><div class="card scroll" id="problemsTable"></div></section>
   <section id="t-staff" class="hidden"><div class="card scroll" id="staffTable"></div></section>
+  <section id="t-rests" class="hidden"><div class="card scroll" id="restsTable"></div></section>
   <section id="t-items" class="hidden">
+    <div class="card toolbar" style="margin-bottom:12px">
+      <div class="row"><b>Чек-лист ресторану:</b> <select id="itemsRest"></select> <span class="muted" id="itemsCount"></span></div>
+      <div class="row"><span class="muted">Скопіювати пункти з</span> <select id="copyFrom" class="sm"></select> <button class="btn ghost" id="copyBtn">Копіювати</button></div>
+    </div>
     <div class="card" style="margin-bottom:12px">
       <h2>Додати пункт</h2>
       <form id="itemForm" class="row">
@@ -163,7 +175,6 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--none)}
         <label class="row" style="gap:4px"><input type="checkbox" name="photo_required"> фото</label>
         <input name="ok_min" type="number" step="any" placeholder="мін" style="width:70px">
         <input name="ok_max" type="number" step="any" placeholder="макс" style="width:70px">
-        <select name="restaurant_id"><option value="">Для всіх</option></select>
         <input name="position" type="number" placeholder="Порядок" style="width:90px">
         <button class="btn">Додати</button>
       </form>
@@ -228,23 +239,25 @@ async function loadAll() {
   let qp = sb.from("answers").select("id,question,section,value_bool,value_number,value_text,comment,photo_path,answered_at,submission_id,submissions!inner(work_date,restaurant_id,staff_name)")
     .eq("is_problem", true).gte("submissions.work_date", from).lte("submissions.work_date", to).order("answered_at", { ascending: false });
   if (rid) { qs = qs.eq("restaurant_id", rid); qp = qp.eq("submissions.restaurant_id", rid); }
-  const [r, s, p, st, it] = await Promise.all([
+  const [r, s, p, st, it, sr] = await Promise.all([
     sb.from("restaurants").select("*").order("name"), qs, qp,
     sb.from("staff").select("*").order("created_at", { ascending: false }),
     sb.from("checklist_items").select("*").order("position").order("id"),
+    sb.from("staff_restaurants").select("*"),
   ]);
-  const err = [r, s, p, st, it].find((x) => x.error);
+  const err = [r, s, p, st, it, sr].find((x) => x.error);
   if (err) { alert("Помилка завантаження: " + err.error.message + "\nПеревір, що твій email додано в dashboard_admins."); return; }
-  S = { restaurants: r.data, subs: s.data, problems: p.data, staff: st.data, items: it.data };
+  S = { restaurants: r.data, subs: s.data, problems: p.data, staff: st.data, items: it.data, links: sr.data };
   fillRestSelects();
-  renderOverview(); renderReports(); renderProblems(); renderStaff(); renderItems();
+  renderOverview(); renderReports(); renderProblems(); renderStaff(); renderItems(); renderRests();
 }
 
 const restName = (id) => S.restaurants.find((r) => r.id === id)?.name ?? "—";
 function fillRestSelects() {
   const opts = S.restaurants.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
   const f = $("#fRest"), cur = f.value; f.innerHTML = `<option value="">Усі ресторани</option>` + opts; f.value = cur;
-  const g = document.querySelector('#itemForm [name=restaurant_id]'); const c2 = g.value; g.innerHTML = `<option value="">Для всіх</option>` + opts; g.value = c2;
+  const g = $("#itemsRest"), c2 = g.value || f.value || String(S.restaurants[0]?.id ?? "");
+  g.innerHTML = opts; g.value = c2;
 }
 
 // ---------- Огляд ----------
@@ -300,9 +313,9 @@ function renderOverview() {
     const ot = f.filter((x) => !x.is_late).length, pr = f.reduce((a, x) => a + x.problems_cnt, 0);
     const av = f.length ? Math.round(f.reduce((a, x) => a + Number(x.duration_min || 0), 0) / f.length) : null;
     const cov = elapsed ? f.length / elapsed : 0;
-    return `<tr><td>${esc(r.name)}</td><td class="num">${f.length} / ${elapsed}</td><td class="num"><span class="pill ${cov >= .95 ? "ok" : cov >= .7 ? "late" : "bad"}">${pct(f.length, elapsed)}</span></td><td class="num">${pct(ot, f.length)}</td><td class="num">${pr}</td><td class="num">${av ?? "—"}${av !== null ? " хв" : ""}</td><td class="muted">до ${r.open_time.slice(0, 5)}</td></tr>`;
+    return `<tr><td>${esc(r.name)}</td><td class="num">${f.length} / ${elapsed}</td><td class="num"><span class="pill ${cov >= .95 ? "ok" : cov >= .7 ? "late" : "bad"}">${pct(f.length, elapsed)}</span></td><td class="num">${pct(ot, f.length)}</td><td class="num">${pr}</td><td class="num">${av ?? "—"}${av !== null ? " хв" : ""}</td><td class="muted">${r.start_time.slice(0, 5)}–${r.open_time.slice(0, 5)}</td></tr>`;
   }).join("");
-  $("#byRest").innerHTML = `<table><tr><th>Ресторан</th><th class="num">Заповнено</th><th class="num">Покриття</th><th class="num">Вчасно</th><th class="num">Проблем</th><th class="num">Сер. час</th><th>Дедлайн</th></tr>${rows}</table>`;
+  $("#byRest").innerHTML = `<table><tr><th>Ресторан</th><th class="num">Заповнено</th><th class="num">Покриття</th><th class="num">Вчасно</th><th class="num">Проблем</th><th class="num">Сер. час</th><th>Вікно</th></tr>${rows}</table>`;
 }
 
 // ---------- Звіти ----------
@@ -348,50 +361,112 @@ async function renderProblems() {
 }
 
 // ---------- Персонал ----------
+const restsOf = (tid) => S.links.filter((l) => l.telegram_id === tid).map((l) => l.restaurant_id);
 function renderStaff() {
-  const pending = S.staff.filter((s) => !s.active && s.full_name && s.restaurant_id).length;
+  const pending = S.staff.filter((s) => !s.active && s.full_name && restsOf(s.telegram_id).length).length;
   $("#pendingBadge").innerHTML = pending ? `<span class="badge">${pending}</span>` : "";
-  const ropts = (sel) => S.restaurants.map((r) => `<option value="${r.id}" ${r.id === sel ? "selected" : ""}>${esc(r.name)}</option>`).join("");
-  const list = [...S.staff].sort((a, b) => (a.active - b.active));
-  $("#staffTable").innerHTML = list.length ? `<table><tr><th>Імʼя</th><th>Telegram</th><th>Ресторан</th><th>Зареєстр.</th><th>Доступ</th></tr>${
-    list.map((s) => `<tr><td>${esc(s.full_name || "— (не завершив реєстрацію)")}</td><td class="muted">${s.username ? "@" + esc(s.username) : s.telegram_id}</td><td><select data-rest="${s.telegram_id}"><option value="">—</option>${ropts(s.restaurant_id)}</select></td><td class="muted">${new Date(s.created_at).toLocaleDateString("uk-UA")}</td><td><button class="btn ${s.active ? "ghost" : ""}" data-act="${s.telegram_id}" data-v="${!s.active}">${s.active ? "Вимкнути" : "Підтвердити"}</button></td></tr>`).join("")}</table>`
+  const list = [...S.staff].sort((a, b) => (a.active - b.active) || String(a.full_name).localeCompare(String(b.full_name), "uk"));
+  $("#staffTable").innerHTML = list.length ? `<table><tr><th>Імʼя</th><th>Telegram</th><th>Ресторани</th><th>Зареєстр.</th><th>Доступ</th></tr>${
+    list.map((s) => {
+      const mine = restsOf(s.telegram_id);
+      const chips = mine.map((rid) => `<span class="chip">${esc(restName(rid))}<button title="Прибрати" data-unlink="${s.telegram_id}:${rid}">×</button></span>`).join("");
+      const free = S.restaurants.filter((r) => !mine.includes(r.id));
+      const add = free.length ? `<select class="sm" data-link="${s.telegram_id}"><option value="">+ ресторан</option>${free.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select>` : "";
+      return `<tr><td>${esc(s.full_name || "— (не завершив реєстрацію)")}</td><td class="muted">${s.username ? "@" + esc(s.username) : s.telegram_id}</td><td>${chips}${add}</td><td class="muted">${new Date(s.created_at).toLocaleDateString("uk-UA")}</td><td><button class="btn ${s.active ? "ghost" : ""}" data-act="${s.telegram_id}" data-v="${!s.active}">${s.active ? "Вимкнути" : "Підтвердити"}</button></td></tr>`;
+    }).join("")}</table>`
     : `<div class="empty">Ще ніхто не зареєструвався. Працівник має написати боту /start.</div>`;
   $("#staffTable").querySelectorAll("[data-act]").forEach((b) => b.onclick = async () => {
     const { error } = await sb.from("staff").update({ active: b.dataset.v === "true" }).eq("telegram_id", b.dataset.act);
     if (error) alert(error.message); else loadAll();
   });
-  $("#staffTable").querySelectorAll("[data-rest]").forEach((s) => s.onchange = async () => {
-    const { error } = await sb.from("staff").update({ restaurant_id: s.value || null }).eq("telegram_id", s.dataset.rest);
-    if (error) alert(error.message);
+  $("#staffTable").querySelectorAll("[data-link]").forEach((sel) => sel.onchange = async () => {
+    if (!sel.value) return;
+    const { error } = await sb.from("staff_restaurants").insert({ telegram_id: Number(sel.dataset.link), restaurant_id: Number(sel.value) });
+    if (error) alert(error.message); else loadAll();
+  });
+  $("#staffTable").querySelectorAll("[data-unlink]").forEach((b) => b.onclick = async () => {
+    const [tid, rid] = b.dataset.unlink.split(":");
+    const { error } = await sb.from("staff_restaurants").delete().eq("telegram_id", tid).eq("restaurant_id", rid);
+    if (error) alert(error.message); else loadAll();
   });
 }
 
-// ---------- Чеклист ----------
+// ---------- Ресторани ----------
+function renderRests() {
+  $("#restsTable").innerHTML = `<table><tr><th>Ресторан</th><th>Починати з</th><th>Завершити до</th><th class="num">Пунктів</th><th class="num">Працівників</th><th>Активний</th></tr>${
+    S.restaurants.map((r) => `<tr style="${r.active ? "" : "opacity:.5"}"><td>${esc(r.name)}</td>
+      <td><input type="time" data-time="${r.id}" data-f="start_time" value="${r.start_time.slice(0, 5)}"></td>
+      <td><input type="time" data-time="${r.id}" data-f="open_time" value="${r.open_time.slice(0, 5)}"></td>
+      <td class="num">${S.items.filter((i) => i.restaurant_id === r.id && i.active).length}</td>
+      <td class="num">${S.links.filter((l) => l.restaurant_id === r.id).length}</td>
+      <td><input type="checkbox" class="switch" data-ractive="${r.id}" ${r.active ? "checked" : ""}></td></tr>`).join("")}</table>
+    <p class="muted" style="margin:10px 0 0">Раніше «Починати з» бот не дасть стартувати. Завершено після «Завершити до» — запізнення.</p>`;
+  $("#restsTable").querySelectorAll("[data-time]").forEach((inp) => inp.onchange = async () => {
+    const r = S.restaurants.find((x) => String(x.id) === inp.dataset.time);
+    const patch = { [inp.dataset.f]: inp.value };
+    const st = patch.start_time ?? r.start_time.slice(0, 5), en = patch.open_time ?? r.open_time.slice(0, 5);
+    if (st >= en) { alert("«Починати з» має бути раніше за «Завершити до»."); inp.value = r[inp.dataset.f].slice(0, 5); return; }
+    const { error } = await sb.from("restaurants").update(patch).eq("id", r.id);
+    if (error) alert(error.message); else loadAll();
+  });
+  $("#restsTable").querySelectorAll("[data-ractive]").forEach((c) => c.onchange = async () => {
+    const { error } = await sb.from("restaurants").update({ active: c.checked }).eq("id", c.dataset.ractive);
+    if (error) alert(error.message); else loadAll();
+  });
+}
+
+// ---------- Чек-листи ----------
 const TYPES = { yes_no: "Так / Ні", number: "Число", text: "Текст", photo: "Лише фото" };
+const curRest = () => Number($("#itemsRest").value);
 function renderItems() {
-  const rid = $("#fRest").value;
-  const list = S.items.filter((i) => !rid || !i.restaurant_id || String(i.restaurant_id) === rid);
-  $("#itemsTable").innerHTML = `<table><tr><th class="num">#</th><th>Розділ</th><th>Питання</th><th>Тип</th><th>Фото</th><th>Норма</th><th>Ресторан</th><th>Активний</th><th></th></tr>${
-    list.map((i) => `<tr style="${i.active ? "" : "opacity:.45"}"><td class="num">${i.position}</td><td>${esc(i.section)}</td><td>${esc(i.question)}${i.hint ? `<br><span class="muted">${esc(i.hint)}</span>` : ""}</td><td>${TYPES[i.answer_type]}</td><td>${i.photo_required || i.answer_type === "photo" ? "📷" : ""}</td><td class="muted">${i.ok_min !== null || i.ok_max !== null ? `${i.ok_min ?? "…"} – ${i.ok_max ?? "…"}` : ""}</td><td class="muted">${i.restaurant_id ? esc(restName(i.restaurant_id)) : "усі"}</td><td><input type="checkbox" class="switch" data-tog="${i.id}" ${i.active ? "checked" : ""}></td><td><button class="btn ghost" data-edit="${i.id}">✎</button></td></tr>`).join("")}</table>`;
+  const rid = curRest();
+  const list = S.items.filter((i) => i.restaurant_id === rid);
+  $("#itemsCount").textContent = `${list.filter((i) => i.active).length} активних пунктів`;
+  $("#copyFrom").innerHTML = S.restaurants.filter((r) => r.id !== rid).map((r) => `<option value="${r.id}">${esc(r.name)} (${S.items.filter((i) => i.restaurant_id === r.id && i.active).length})</option>`).join("");
+  $("#itemsTable").innerHTML = list.length ? `<table><tr><th class="num">#</th><th>Розділ</th><th>Питання</th><th>Тип</th><th>Фото</th><th>Норма</th><th>Активний</th><th></th></tr>${
+    list.map((i) => `<tr style="${i.active ? "" : "opacity:.45"}"><td class="num">${i.position}</td><td>${esc(i.section)}</td><td>${esc(i.question)}${i.hint ? `<br><span class="muted">${esc(i.hint)}</span>` : ""}</td><td>${TYPES[i.answer_type]}</td><td>${i.photo_required || i.answer_type === "photo" ? "📷" : ""}</td><td class="muted">${i.ok_min !== null || i.ok_max !== null ? `${i.ok_min ?? "…"} – ${i.ok_max ?? "…"}` : ""}</td><td><input type="checkbox" class="switch" data-tog="${i.id}" ${i.active ? "checked" : ""}></td><td style="white-space:nowrap"><button class="btn ghost" data-edit="${i.id}" title="Редагувати">✎</button> <button class="btn ghost" data-del="${i.id}" title="Видалити">🗑</button></td></tr>`).join("")}</table>`
+    : `<div class="empty">У цього ресторану ще немає пунктів. Додай їх вище або скопіюй з іншого ресторану.</div>`;
   $("#itemsTable").querySelectorAll("[data-tog]").forEach((c) => c.onchange = async () => {
     const { error } = await sb.from("checklist_items").update({ active: c.checked }).eq("id", c.dataset.tog);
     if (error) alert(error.message); else loadAll();
   });
   $("#itemsTable").querySelectorAll("[data-edit]").forEach((b) => b.onclick = async () => {
     const i = S.items.find((x) => String(x.id) === b.dataset.edit);
+    const sec = prompt("Розділ:", i.section); if (sec === null) return;
     const q = prompt("Питання:", i.question); if (q === null) return;
-    const h = prompt("Підказка (до фото тощо):", i.hint ?? ""); if (h === null) return;
+    const h = prompt("Підказка (що фотографувати тощо):", i.hint ?? ""); if (h === null) return;
     const p = prompt("Порядок (число):", i.position); if (p === null) return;
-    const { error } = await sb.from("checklist_items").update({ question: q.trim(), hint: h.trim() || null, position: Number(p) || i.position }).eq("id", i.id);
+    const { error } = await sb.from("checklist_items").update({ section: sec.trim() || i.section, question: q.trim() || i.question, hint: h.trim() || null, position: Number(p) || i.position }).eq("id", i.id);
     if (error) alert(error.message); else loadAll();
   });
+  $("#itemsTable").querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => {
+    const i = S.items.find((x) => String(x.id) === b.dataset.del);
+    if (!confirm(`Видалити пункт «${i.question}»?`)) return;
+    const { error } = await sb.from("checklist_items").delete().eq("id", i.id);
+    if (error) alert(error.code === "23503" ? "На цей пункт уже є відповіді в звітах — вимкни його замість видалення." : error.message);
+    else loadAll();
+  });
 }
+$("#itemsRest").onchange = () => renderItems();
+$("#copyBtn").onclick = async () => {
+  const to = curRest(), from = Number($("#copyFrom").value);
+  const src = S.items.filter((i) => i.restaurant_id === from && i.active);
+  if (!src.length) return alert("У вибраному ресторані немає активних пунктів.");
+  const has = S.items.filter((i) => i.restaurant_id === to).length;
+  if (!confirm(`Скопіювати ${src.length} пунктів з «${restName(from)}» у «${restName(to)}»?${has ? `\nУ «${restName(to)}» уже є ${has} пунктів — нові додадуться в кінець.` : ""}`)) return;
+  const base = has ? Math.max(...S.items.filter((i) => i.restaurant_id === to).map((i) => i.position)) : 0;
+  const rows = src.map(({ id, restaurant_id, ...x }) => ({ ...x, restaurant_id: to, position: x.position + base }));
+  const { error } = await sb.from("checklist_items").insert(rows);
+  if (error) alert(error.message); else loadAll();
+};
 $("#itemForm").onsubmit = async (e) => {
   e.preventDefault();
+  const rid = curRest(); if (!rid) return alert("Обери ресторан.");
   const f = new FormData(e.target), n = (k) => f.get(k) === "" ? null : Number(f.get(k));
+  const mine = S.items.filter((i) => i.restaurant_id === rid);
   const row = { section: f.get("section").trim(), question: f.get("question").trim(), answer_type: f.get("answer_type"),
     photo_required: f.get("photo_required") === "on", ok_min: n("ok_min"), ok_max: n("ok_max"),
-    restaurant_id: n("restaurant_id"), position: n("position") ?? (Math.max(0, ...S.items.map((i) => i.position)) + 10) };
+    restaurant_id: rid, position: n("position") ?? (Math.max(0, ...mine.map((i) => i.position)) + 10) };
   const { error } = await sb.from("checklist_items").insert(row);
   if (error) alert(error.message); else { e.target.reset(); loadAll(); }
 };

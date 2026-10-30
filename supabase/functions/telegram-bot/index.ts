@@ -19,9 +19,9 @@ const db = createClient(
 
 // ---------------- types ----------------
 type Staff = {
-  telegram_id: number; username: string | null; full_name: string | null;
-  restaurant_id: number | null; active: boolean;
+  telegram_id: number; username: string | null; full_name: string | null; active: boolean;
 };
+type Rest = { id: number; name: string; start_time: string; open_time: string; active: boolean };
 type Item = {
   id: number; section: string; question: string; hint: string | null;
   answer_type: "yes_no" | "number" | "text" | "photo";
@@ -55,6 +55,10 @@ const MAIN_KB = { keyboard: [[{ text: BTN_START }], [{ text: BTN_STATUS }]], res
 const NO_KB = { remove_keyboard: true };
 
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date());
+const nowHHMM = () =>
+  new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .format(new Date());
+const hm = (t: string) => t.slice(0, 5);
 const hhmm = (iso: string) =>
   new Intl.DateTimeFormat("uk-UA", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false })
     .format(new Date(iso));
@@ -66,8 +70,7 @@ async function getStaff(id: number): Promise<Staff | null> {
 }
 async function getItems(restaurantId: number): Promise<Item[]> {
   const { data, error } = await db.from("checklist_items").select("*")
-    .eq("active", true)
-    .or(`restaurant_id.is.null,restaurant_id.eq.${restaurantId}`)
+    .eq("active", true).eq("restaurant_id", restaurantId)
     .order("position").order("id");
   if (error) throw error;
   return data ?? [];
@@ -89,6 +92,14 @@ async function saveAnswer(sub: Sub, item: Item, patch: Record<string, unknown>) 
     answered_at: new Date().toISOString(), ...patch,
   }, { onConflict: "submission_id,item_id" });
   if (error) throw error;
+}
+// ресторани працівника (лише активні)
+async function myRestaurants(uid: number): Promise<Rest[]> {
+  const { data, error } = await db.from("staff_restaurants")
+    .select("restaurants(id,name,start_time,open_time,active)").eq("telegram_id", uid);
+  if (error) throw error;
+  return (data ?? []).map((r: any) => r.restaurants as Rest)
+    .filter((r) => r?.active).sort((a, b) => a.name.localeCompare(b.name, "uk"));
 }
 async function restaurantName(id: number) {
   const { data } = await db.from("restaurants").select("name").eq("id", id).single();
@@ -149,8 +160,9 @@ async function handle(u: any) {
     await db.from("staff").update({ full_name: text.slice(0, 80) }).eq("telegram_id", uid);
     return askRestaurant(chat);
   }
-  if (!staff.restaurant_id) return askRestaurant(chat);
   if (!staff.active) {
+    const { count } = await db.from("staff_restaurants").select("*", { count: "exact", head: true }).eq("telegram_id", uid);
+    if (!count) return askRestaurant(chat);
     return send(chat, "⏳ Заявку отримано. Керівник має підтвердити доступ — після цього зможеш заповнювати чеклист.");
   }
 
@@ -179,14 +191,15 @@ async function askRestaurant(chat: number) {
 }
 
 async function showStatus(staff: Staff, chat: number) {
-  const name = await restaurantName(staff.restaurant_id!);
+  const rests = await myRestaurants(staff.telegram_id);
+  const list = rests.map((r) => `• ${esc(r.name)} — з ${hm(r.start_time)} до ${hm(r.open_time)}`).join("\n") || "немає (звернись до керівника)";
   const { data } = await db.from("v_submissions").select("work_date,completed_at,problems_cnt")
     .eq("telegram_id", staff.telegram_id).eq("status", "completed")
     .order("completed_at", { ascending: false }).limit(1).maybeSingle();
   const last = data
     ? `${data.work_date.split("-").reverse().join(".")} о ${hhmm(data.completed_at)}, проблем: ${data.problems_cnt}`
     : "ще не було";
-  return send(chat, `👤 ${esc(staff.full_name!)}\n🍽 ${esc(name)}\n🕘 Останній чеклист: ${last}`, { reply_markup: MAIN_KB });
+  return send(chat, `👤 ${esc(staff.full_name!)}\n🍽 Ресторани:\n${list}\n🕘 Останній чеклист: ${last}`, { reply_markup: MAIN_KB });
 }
 
 // ---------------- checklist flow ----------------
@@ -194,20 +207,34 @@ async function startChecklist(staff: Staff, chat: number) {
   const open = await getOpenSub(staff.telegram_id);
   if (open) {
     if (open.work_date === today()) {
-      await send(chat, "Продовжуємо чеклист з місця, де зупинились.", { reply_markup: NO_KB });
+      const name = await restaurantName(open.restaurant_id);
+      await send(chat, `Продовжуємо чеклист <b>${esc(name)}</b> з місця, де зупинились.\nСкасувати: /cancel`, { reply_markup: NO_KB });
       return askCurrent(open, chat);
     }
     await setSub(open, { status: "abandoned" });
   }
-  const items = await getItems(staff.restaurant_id!);
-  if (!items.length) return send(chat, "Для твого ресторану ще немає пунктів чеклиста.");
+  const rests = await myRestaurants(staff.telegram_id);
+  if (!rests.length) return send(chat, "За тобою ще не закріплено жодного ресторану. Звернись до керівника.");
+  if (rests.length === 1) return beginChecklist(staff, rests[0], chat);
+  return send(chat, "Який ресторан відкриваєш?", {
+    reply_markup: { inline_keyboard: rests.map((r) => [{ text: `${r.name} · ${hm(r.start_time)}–${hm(r.open_time)}`, callback_data: `go:${r.id}` }]) },
+  });
+}
+
+async function beginChecklist(staff: Staff, rest: Rest, chat: number) {
+  const now = nowHHMM();
+  if (now < hm(rest.start_time)) {
+    return send(chat, `⏰ Чеклист <b>${esc(rest.name)}</b> можна починати з ${hm(rest.start_time)}. Зараз ${now}.`, { reply_markup: MAIN_KB });
+  }
+  const items = await getItems(rest.id);
+  if (!items.length) return send(chat, `Для ${esc(rest.name)} ще немає пунктів чеклиста. Звернись до керівника.`, { reply_markup: MAIN_KB });
   const { data, error } = await db.from("submissions").insert({
-    restaurant_id: staff.restaurant_id, telegram_id: staff.telegram_id,
+    restaurant_id: rest.id, telegram_id: staff.telegram_id,
     staff_name: staff.full_name, work_date: today(),
   }).select().single();
   if (error) throw error;
-  const name = await restaurantName(staff.restaurant_id!);
-  await send(chat, `🚀 Відкриття <b>${esc(name)}</b> — ${items.length} пунктів.\nСкасувати: /cancel`, { reply_markup: NO_KB });
+  const late = now > hm(rest.open_time) ? `\n⚠️ Дедлайн ${hm(rest.open_time)} уже минув — буде позначено як запізнення.` : `\nЗавершити до ${hm(rest.open_time)}.`;
+  await send(chat, `🚀 Відкриття <b>${esc(rest.name)}</b> — ${items.length} пунктів.${late}\nСкасувати: /cancel`, { reply_markup: NO_KB });
   return askCurrent(data as Sub, chat);
 }
 
@@ -412,7 +439,9 @@ async function onCallback(q: any) {
     const staff = await getStaff(uid);
     if (!staff?.full_name || staff.active) return;
     const rid = Number(data.slice(4));
-    await db.from("staff").update({ restaurant_id: rid }).eq("telegram_id", uid);
+    const { count } = await db.from("staff_restaurants").select("*", { count: "exact", head: true }).eq("telegram_id", uid);
+    if (count) return;
+    await db.from("staff_restaurants").insert({ telegram_id: uid, restaurant_id: rid });
     const name = await restaurantName(rid);
     await tg("editMessageText", { chat_id: chat, message_id: q.message.message_id, text: `Ресторан: ${name}` });
     await send(chat, "⏳ Заявку надіслано. Керівник підтвердить доступ у панелі звітів.");
@@ -420,6 +449,16 @@ async function onCallback(q: any) {
       await send(REPORT_CHAT_ID, `🆕 Новий працівник чекає підтвердження: <b>${esc(staff.full_name)}</b> (${esc(name)})`);
     }
     return;
+  }
+
+  if (data.startsWith("go:")) {
+    const staff = await getStaff(uid);
+    if (!staff?.active) return;
+    const rest = (await myRestaurants(uid)).find((r) => r.id === Number(data.slice(3)));
+    if (!rest) return send(chat, "Цей ресторан за тобою не закріплений.");
+    if (await getOpenSub(uid)) return send(chat, "У тебе вже є незавершений чеклист — натисни «Почати чеклист відкриття», щоб продовжити, або /cancel.");
+    await tg("editMessageText", { chat_id: chat, message_id: q.message.message_id, text: `Ресторан: ${rest.name}` });
+    return beginChecklist(staff, rest, chat);
   }
 
   if (data.startsWith("yn:")) {
