@@ -9,18 +9,21 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,800;1,400&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <style>
 :root{
   --bg:#f6f5f2;--card:#fff;--ink:#1d1c1a;--muted:#6f6b64;--line:#e6e2da;
   --ok:#2f8a4e;--ok-bg:#e3f2e7;--warn:#b7791f;--warn-bg:#fbf0dc;--bad:#c2412d;--bad-bg:#fbe5e1;
-  --none:#efece6;--accent:#1d1c1a;--accent-ink:#fff;
+  --none:#efece6;--accent:#1d1c1a;--accent-ink:#fff;--brand:#e30613;
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#141413;--card:#1e1d1b;--ink:#efede8;--muted:#a19c93;--line:#2f2d2a;
   --ok:#5cc07c;--ok-bg:#1f3427;--warn:#e0a548;--warn-bg:#3a2e17;--bad:#ef7a65;--bad-bg:#3d211c;
-  --none:#26241f;--accent:#efede8;--accent-ink:#141413;
+  --none:#26241f;--accent:#efede8;--accent-ink:#141413;--brand:#ff2d3a;
 }}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -30,6 +33,13 @@ header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:s
 h1{font-size:20px;margin:0;letter-spacing:-.01em}
 h2{font-size:15px;margin:0 0 10px}
 .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.brand{display:flex;flex-direction:column;gap:6px;min-width:0;max-width:480px}
+.logo{font-family:Inter,"Helvetica Neue",Helvetica,Arial,sans-serif;font-weight:800;font-size:30px;line-height:1;letter-spacing:-.035em;color:var(--ink);white-space:nowrap;margin:0}
+.logo .dot{display:inline-block;width:.2em;height:.2em;border-radius:50%;background:var(--brand);margin:0 .08em 0 .06em;vertical-align:baseline}
+.quote{margin:0;font-family:Inter,Georgia,serif;font-style:italic;font-size:14px;color:var(--muted);line-height:1.4}
+.quote cite{font-style:normal;font-size:12px;white-space:nowrap}
+.quote cite::before{content:"— "}
+.login .logo{font-size:28px;margin-bottom:4px}
 input,select,textarea{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
 .btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:600}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
@@ -99,7 +109,7 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--none)}
 
 <!-- Вхід -->
 <div id="loginView" class="center hidden"><form class="card login" id="loginForm">
-  <h1>Чеклисти відкриття</h1>
+  <div class="logo" role="img" aria-label="23. чек-листи">23<span class="dot"></span> чек-листи</div>
   <input id="email" type="email" placeholder="Email" autocomplete="username" required>
   <input id="pass" type="password" placeholder="Пароль" autocomplete="current-password" required>
   <button class="btn">Увійти</button>
@@ -110,7 +120,10 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--none)}
 <!-- Панель -->
 <div id="appView" class="wrap hidden">
   <header>
-    <h1>Чеклисти відкриття</h1>
+    <div class="brand">
+      <div class="logo" role="img" aria-label="23. чек-листи">23<span class="dot"></span> чек-листи</div>
+      <p class="quote" id="quote"></p>
+    </div>
     <div class="filters">
       <input type="date" id="dFrom"> – <input type="date" id="dTo">
       <select id="fRest"><option value="">Усі ресторани</option></select>
@@ -383,6 +396,9 @@ $("#itemForm").onsubmit = async (e) => {
   if (error) alert(error.message); else { e.target.reset(); loadAll(); }
 };
 
+const QUOTES = [["Менеджери роблять речі правильно, а лідери роблять правильні речі.","Пітер Друкер"],["Немає нічого марнішого, ніж ефективно робити те, чого взагалі не слід було робити.","Пітер Друкер"],["Лідер знає шлях, іде цим шляхом і показує шлях іншим.","Джон Максвелл"],["Лідерство — це здатність перетворювати бачення на реальність.","Воррен Бенніс"],["До того як стати лідером, успіх — це твоє зростання. Коли стаєш лідером, успіх — це зростання інших.","Джек Велч"],["Лідери відповідають не за результат, а за людей, які відповідають за результат.","Саймон Сінек"],["Немає сенсу наймати розумних людей і казати їм, що робити. Ми наймаємо їх, щоб вони казали нам, що робити.","Стів Джобс"],["Ми — те, що робимо постійно. Досконалість — не вчинок, а звичка.","Вілл Дюрант, за Арістотелем"],["Найкращий правитель той, про кого ледь знають. Коли справу зроблено, люди кажуть: «Ми зробили це самі».","Лао-цзи"],["Плани — ніщо, планування — все.","Дуайт Ейзенхауер"],["Найкращий керівник має досить розуму, щоб дібрати добрих людей, і досить витримки, щоб не заважати їм працювати.","Теодор Рузвельт"],["Ніхто з нас не такий сильний, як усі ми разом.","Рей Крок"],["Гостинність — це коли щось відбувається для гостя, а не з гостем.","Денні Маєр"],["Подбайте про своїх працівників — і вони подбають про ваших клієнтів.","Річард Бренсон"],["Бос лише один — клієнт. Він може звільнити будь-кого в компанії, просто витративши гроші деінде.","Сем Волтон"],["Головне — щоб головне залишалося головним.","Стівен Кові"],["Якість — це справа кожного.","Едвардс Демінг"],["В умовах складності чек-листи не просто допомагають — без них успіху не буде.","Атул Гаванде"],["Лідерство — це мистецтво досягати більшого, ніж вважає можливим наука управління.","Колін Павелл"],["Працюйте над бізнесом, а не лише в бізнесі.","Майкл Гербер"],["Мізанплас — це релігія кожного хорошого кухаря.","Ентоні Бурден"]];
+(() => { const [t, a] = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  $("#quote").innerHTML = `«${esc(t)}» <cite>${esc(a)}</cite>`; })();
 boot();
 </script>
 </body>
