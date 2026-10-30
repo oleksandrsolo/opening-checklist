@@ -5,6 +5,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
 const SECRET = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") ?? "";
 const REPORT_CHAT_ID = Deno.env.get("REPORT_CHAT_ID") ?? ""; // група керівників (необовʼязково)
+// Сторінка-камера (Mini App). Якщо задано — фото приймаються ТІЛЬКИ з неї.
+const CAMERA_URL = Deno.env.get("CAMERA_URL") ?? "";
 const TZ = "Europe/Kyiv";
 const BUCKET = "checklist-photos";
 const API = `https://api.telegram.org/bot${TOKEN}`;
@@ -94,7 +96,25 @@ async function restaurantName(id: number) {
 }
 
 // ---------------- entry point ----------------
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "POST, OPTIONS",
+  "access-control-allow-headers": "content-type, x-tg-init-data",
+};
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, "content-type": "application/json" } });
+
 Deno.serve(async (req) => {
+  // Фото зі сторінки-камери
+  if (new URL(req.url).pathname.endsWith("/photo")) {
+    if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
+    try {
+      return await onCameraUpload(req);
+    } catch (e) {
+      console.error(e);
+      return json({ error: "Не вдалося зберегти фото. Спробуй ще раз." }, 500);
+    }
+  }
   if (req.method !== "POST") return new Response("ok");
   if (SECRET && req.headers.get("x-telegram-bot-api-secret-token") !== SECRET) {
     return new Response("forbidden", { status: 403 });
@@ -205,10 +225,7 @@ async function askCurrent(sub: Sub, chat: number) {
   if (step === "comment") {
     return send(chat, "✍️ Опиши коротко, що не так і що робиш, щоб виправити.");
   }
-  if (step === "photo") {
-    const q = item.answer_type === "photo" ? head + esc(item.question) + "\n\n" : "";
-    return send(chat, `${q}📷 Надішли фото${item.hint ? `: ${esc(item.hint)}` : ""}.`);
-  }
+  if (step === "photo") return askPhoto(sub, item, chat, head);
   const hint = item.hint && !item.photo_required ? `\n<i>${esc(item.hint)}</i>` : "";
   const body = head + esc(item.question) + hint;
   if (item.answer_type === "yes_no") {
@@ -239,6 +256,10 @@ async function onAnswer(sub: Sub, m: any, chat: number) {
   const text: string = (m.text ?? m.caption ?? "").trim();
 
   if (step === "photo") {
+    if (CAMERA_URL) {
+      await send(chat, "🚫 Фото з галереї чи чату не приймаються — лише знімок через камеру бота.");
+      return askPhoto(sub, item, chat, "");
+    }
     const fileId = m.photo?.at(-1)?.file_id
       ?? (m.document?.mime_type?.startsWith("image/") ? m.document.file_id : null);
     if (!fileId) return send(chat, "Потрібне саме фото 📷 — зроби знімок і надішли.");
@@ -282,11 +303,75 @@ async function answerYesNo(sub: Sub, item: Item, yes: boolean, chat: number) {
   return afterAnswer(sub, item, !yes, chat);
 }
 
+async function askPhoto(sub: Sub, item: Item, chat: number, head: string) {
+  const q = item.answer_type === "photo" ? head + esc(item.question) + "\n\n" : "";
+  const what = item.hint ? `: ${esc(item.hint)}` : "";
+  if (!CAMERA_URL) return send(chat, `${q}📷 Надішли фото${what}.`);
+  const url = `${CAMERA_URL}?s=${sub.id}&i=${item.id}&t=${encodeURIComponent(item.hint ?? item.question)}`;
+  return send(chat, `${q}📷 Зроби фото${what}.\nНатисни кнопку — відкриється камера.`, {
+    reply_markup: { inline_keyboard: [[{ text: "📷 Зробити фото", web_app: { url } }]] },
+  });
+}
+
+// Перевірка підпису Telegram Mini App (initData) → telegram user id або null
+async function verifyInitData(initData: string): Promise<number | null> {
+  const p = new URLSearchParams(initData);
+  const hash = p.get("hash");
+  if (!hash) return null;
+  p.delete("hash");
+  const dcs = [...p.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`).join("\n");
+  const enc = new TextEncoder();
+  const hmac = async (key: BufferSource, data: string) => {
+    const k = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    return new Uint8Array(await crypto.subtle.sign("HMAC", k, enc.encode(data)));
+  };
+  const secret = await hmac(enc.encode("WebAppData"), TOKEN);
+  const sig = await hmac(secret, dcs);
+  const hex = [...sig].map((b) => b.toString(16).padStart(2, "0")).join("");
+  if (hex !== hash) return null;
+  if (Date.now() / 1000 - Number(p.get("auth_date") ?? 0) > 3 * 3600) return null;
+  try {
+    return JSON.parse(p.get("user") ?? "{}").id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function onCameraUpload(req: Request) {
+  if (req.method !== "POST") return json({ error: "method" }, 405);
+  const uid = await verifyInitData(req.headers.get("x-tg-init-data") ?? "");
+  if (!uid) return json({ error: "Сесія недійсна. Відкрий камеру кнопкою в боті ще раз." }, 401);
+  const qs = new URL(req.url).searchParams;
+  const { data: sub } = await db.from("submissions").select("*").eq("id", qs.get("s") ?? "").maybeSingle();
+  if (!sub || Number(sub.telegram_id) !== uid || sub.status !== "in_progress") {
+    return json({ error: "Цей чеклист уже не активний." }, 409);
+  }
+  const items = await getItems(sub.restaurant_id);
+  const item = items[sub.current_index];
+  if (!item || String(item.id) !== qs.get("i") || effectiveStep(sub, item) !== "photo") {
+    return json({ error: "Це фото вже не потрібне — повернись у чат." }, 409);
+  }
+  const bytes = new Uint8Array(await req.arrayBuffer());
+  if (bytes.length < 5_000 || bytes.length > 10_000_000 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+    return json({ error: "Некоректне фото." }, 400);
+  }
+  const path = await uploadPhoto(sub, item, bytes);
+  await saveAnswer(sub, item, { photo_path: path });
+  await setSub(sub, { current_index: sub.current_index + 1, step: "answer" });
+  await send(uid, "✅ Фото збережено.");
+  await askCurrent(sub, uid);
+  return json({ ok: true });
+}
+
 async function savePhoto(sub: Sub, item: Item, fileId: string) {
   const f = await tg("getFile", { file_id: fileId });
   if (!f?.file_path) throw new Error("getFile failed");
   const r = await fetch(`https://api.telegram.org/file/bot${TOKEN}/${f.file_path}`);
-  const bytes = new Uint8Array(await r.arrayBuffer());
+  return uploadPhoto(sub, item, new Uint8Array(await r.arrayBuffer()));
+}
+
+async function uploadPhoto(sub: Sub, item: Item, bytes: Uint8Array) {
   const path = `${sub.restaurant_id}/${sub.work_date}/${sub.id}/${item.id}-${Date.now()}.jpg`;
   const { error } = await db.storage.from(BUCKET).upload(path, bytes, { contentType: "image/jpeg", upsert: true });
   if (error) throw error;

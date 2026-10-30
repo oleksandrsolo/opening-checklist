@@ -34,7 +34,8 @@ jobs:
 
       - name: Секрети функції
         run: |
-          args="TELEGRAM_BOT_TOKEN=$TG_TOKEN TELEGRAM_WEBHOOK_SECRET=$TG_SECRET"
+          owner="${GITHUB_REPOSITORY_OWNER,,}"; repo="${GITHUB_REPOSITORY#*/}"
+          args="TELEGRAM_BOT_TOKEN=$TG_TOKEN TELEGRAM_WEBHOOK_SECRET=$TG_SECRET CAMERA_URL=https://${owner}.github.io/${repo}/camera.html"
           [ -n "$REPORT_CHAT_ID" ] && args="$args REPORT_CHAT_ID=$REPORT_CHAT_ID"
           supabase secrets set $args --project-ref "$PROJECT_REF"
 
