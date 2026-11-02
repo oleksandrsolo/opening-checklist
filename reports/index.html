@@ -18,12 +18,12 @@
 :root{
   --bg:#f6f5f2;--card:#fff;--ink:#1d1c1a;--muted:#6f6b64;--line:#e6e2da;
   --ok:#2f8a4e;--ok-bg:#e3f2e7;--warn:#b7791f;--warn-bg:#fbf0dc;--bad:#c2412d;--bad-bg:#fbe5e1;
-  --none:#efece6;--accent:#1d1c1a;--accent-ink:#fff;--brand:#e30613;
+  --none:#efece6;--accent:#1d1c1a;--accent-ink:#fff;--brand:#e30613;--dash:#b9b2a6;
 }
 @media (prefers-color-scheme:dark){:root{
   --bg:#141413;--card:#1e1d1b;--ink:#efede8;--muted:#a19c93;--line:#2f2d2a;
   --ok:#5cc07c;--ok-bg:#1f3427;--warn:#e0a548;--warn-bg:#3a2e17;--bad:#ef7a65;--bad-bg:#3d211c;
-  --none:#26241f;--accent:#efede8;--accent-ink:#141413;--brand:#ff2d3a;
+  --none:#26241f;--accent:#efede8;--accent-ink:#141413;--brand:#ff2d3a;--dash:#5a564f;
 }}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -53,6 +53,8 @@ input,select,textarea{background:var(--card);border:1px solid var(--line);border
 .kpi .v{font-size:26px;font-weight:700;letter-spacing:-.02em}
 .kpi .l{color:var(--muted);font-size:12px}
 .two{grid-template-columns:1fr;margin-top:12px}
+.grid>*{min-width:0}
+@media(max-width:600px){.matrix th.r,.matrix td.r{white-space:normal;min-width:84px;font-size:12px}.cell{min-width:30px}.week-nav b{min-width:0}}
 @media(min-width:900px){.two{grid-template-columns:3fr 2fr}}
 .scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
@@ -60,14 +62,16 @@ th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertic
 th{color:var(--muted);font-weight:500;font-size:12px;white-space:nowrap}
 tr.click{cursor:pointer} tr.click:hover td{background:var(--none)}
 .num{text-align:right;font-variant-numeric:tabular-nums}
+.matrix{width:100%}
 .matrix td,.matrix th{padding:3px;border:0;text-align:center}
+.matrix th.today{color:var(--ink);font-weight:700}
 .matrix th.r,.matrix td.r{text-align:left;white-space:nowrap;padding-right:10px;font-size:13px}
-.cell{width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;cursor:default}
+.cell{width:100%;min-width:34px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;cursor:default}
 .cell.ok{background:var(--ok-bg);color:var(--ok);cursor:pointer}
 .cell.late{background:var(--warn-bg);color:var(--warn);cursor:pointer}
 .cell.miss{background:var(--bad-bg);color:var(--bad)}
 .cell.wip{background:var(--none);color:var(--muted);cursor:pointer}
-.cell.fut{background:transparent;border:1px dashed var(--line)}
+.cell.fut{background:var(--none);border:1.5px dashed var(--dash);opacity:.8}
 .legend{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:8px}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:12px;font-weight:600}
@@ -100,6 +104,34 @@ tr.click{cursor:pointer} tr.click:hover td{background:var(--none)}
 select.sm{padding:3px 6px;font-size:13px}
 input[type=time]{padding:5px 7px}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.fbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;padding:10px 12px}
+.fbar select,.fbar input{padding:6px 8px}
+.fbar .fcount{margin-left:auto;font-size:13px;color:var(--muted)}
+.cardhead{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cardhead h2{margin:0}
+.week-nav{display:flex;align-items:center;gap:6px;font-size:13px}
+.week-nav b{min-width:150px;text-align:center;font-weight:600}
+.icon-btn{width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:transparent;cursor:pointer;font-size:17px;line-height:1;color:var(--ink);padding:0}
+.icon-btn:hover{background:var(--none)}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin:12px 0 6px;padding:12px;background:var(--bg);border-radius:10px}
+.meta .k{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.print-only{display:none}
+@media print{
+  :root{--bg:#f4f4f4;--card:#fff;--ink:#000;--muted:#555;--line:#d8d8d8;--ok:#1f7a3f;--ok-bg:#e3f2e7;--warn:#9a6212;--warn-bg:#fbf0dc;--bad:#b3261e;--bad-bg:#fbe5e1;--none:#eee}
+  @page{size:A4;margin:14mm 12mm}
+  html,body{background:#fff!important;color:#000}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body.printing>*:not(#modal){display:none!important}
+  body.printing #modal{position:static;display:block;background:none;padding:0;overflow:visible}
+  body.printing .modal{max-width:none;width:auto;padding:0;border-radius:0;background:#fff}
+  .no-print{display:none!important}
+  .print-only{display:block!important}
+  .print-head{display:flex!important;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px}
+  .print-head .logo{font-size:22px}
+  .ans,.meta{break-inside:avoid}
+  .sec{break-after:avoid}
+  .thumb{width:72mm;height:54mm;cursor:default}
+}
 </style>
 </head>
 <body>
@@ -131,8 +163,6 @@ input[type=time]{padding:5px 7px}
       <p class="quote" id="quote"></p>
     </div>
     <div class="filters">
-      <input type="date" id="dFrom"> – <input type="date" id="dTo">
-      <select id="fRest"><option value="">Усі ресторани</option></select>
       <button class="btn ghost" id="refresh">Оновити</button>
       <button class="btn ghost" id="logout">Вийти</button>
     </div>
@@ -147,18 +177,23 @@ input[type=time]{padding:5px 7px}
   </nav>
 
   <section id="t-overview">
-    <div class="grid kpis" id="kpis"></div>
-    <div class="grid two">
-      <div class="card"><h2>Відкриття по днях</h2><div class="scroll" id="matrix"></div>
-        <div class="legend"><span><i style="background:var(--ok-bg)"></i>вчасно</span><span><i style="background:var(--warn-bg)"></i>із запізненням</span><span><i style="background:var(--bad-bg)"></i>не заповнено</span><span><i style="background:var(--none)"></i>в процесі</span><span>цифра — к-ть проблем</span></div>
+    <div class="card fbar" id="f-ov"></div>
+    <div class="grid two" style="margin-top:0">
+      <div class="card">
+        <div class="cardhead"><h2>Відкриття по тижнях</h2>
+          <div class="week-nav"><button class="icon-btn" id="weekPrev" title="Попередній тиждень">‹</button><b id="weekLabel"></b><button class="icon-btn" id="weekNext" title="Наступний тиждень">›</button><button class="btn ghost hidden" id="weekNow" style="padding:6px 10px">Поточний</button></div>
+        </div>
+        <div class="scroll" id="matrix"></div>
+        <div class="legend"><span><i style="background:var(--ok-bg)"></i>вчасно</span><span><i style="background:var(--warn-bg)"></i>із запізненням</span><span><i style="background:var(--bad-bg)"></i>не заповнено</span><span><i style="background:var(--none)"></i>в процесі</span><span><i style="background:var(--none);border:1.5px dashed var(--dash)"></i>майбутні дні</span><span>цифра — к-ть проблем</span></div>
       </div>
       <div class="card"><h2>Найчастіші проблеми</h2><div id="topProblems"></div></div>
     </div>
+    <div class="grid kpis" id="kpis" style="margin-top:12px"></div>
     <div class="card" style="margin-top:12px"><h2>По ресторанах</h2><div class="scroll" id="byRest"></div></div>
   </section>
 
-  <section id="t-reports" class="hidden"><div class="card scroll" id="reportsTable"></div></section>
-  <section id="t-problems" class="hidden"><div class="card scroll" id="problemsTable"></div></section>
+  <section id="t-reports" class="hidden"><div class="card fbar" id="f-rep"></div><div class="card scroll" id="reportsTable"></div></section>
+  <section id="t-problems" class="hidden"><div class="card fbar" id="f-prob"></div><div class="card scroll" id="problemsTable"></div></section>
   <section id="t-staff" class="hidden"><div class="card scroll" id="staffTable"></div></section>
   <section id="t-rests" class="hidden"><div class="card scroll" id="restsTable"></div></section>
   <section id="t-items" class="hidden">
@@ -200,7 +235,16 @@ const addDays = (d, n) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x
 const dayRange = (a, b) => { const out = []; for (let d = a; d <= b && out.length < 93; d = addDays(d, 1)) out.push(d); return out; };
 const WD = ["Нд", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 
-let sb, S = { restaurants: [], subs: [], problems: [], staff: [], items: [] };
+let sb, S = { restaurants: [], staff: [], items: [], links: [] };
+const SUBS = {};            // кеш звітів за id
+const F = {};               // стан фільтрів по вкладках
+let WEEK = null;            // понеділок тижня, що показується
+let mounted = false;
+
+const mondayOf = (d) => addDays(d, -((new Date(d + "T12:00:00Z").getUTCDay() + 6) % 7));
+const monthEnd = (d) => { const [y, m] = d.split("-").map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "—";
+const plural = (n, one, few, many) => { const a = n % 10, b = n % 100; return `${n} ${a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many}`; };
 
 function show(view) { ["cfgView", "loginView", "appView"].forEach((v) => $("#" + v).classList.toggle("hidden", v !== view)); }
 
@@ -210,8 +254,13 @@ async function boot() {
   const { data } = await sb.auth.getSession();
   if (!data.session) return show("loginView");
   show("appView");
-  const t = kyivToday();
-  $("#dTo").value ||= t; $("#dFrom").value ||= addDays(t, -6);
+  if (!mounted) {
+    mounted = true;
+    WEEK = mondayOf(kyivToday());
+    mountFilter("ov", "#f-ov", false, () => { loadOverview(); loadWeek(); });
+    mountFilter("rep", "#f-rep", true, () => loadReports());
+    mountFilter("prob", "#f-prob", true, () => loadProblems());
+  }
   await loadAll();
 }
 
@@ -224,89 +273,162 @@ $("#loginForm").onsubmit = async (e) => {
 };
 $("#logout").onclick = async () => { await sb.auth.signOut(); location.reload(); };
 $("#refresh").onclick = () => loadAll();
-["#dFrom", "#dTo", "#fRest"].forEach((s) => $(s).onchange = () => loadAll());
 document.querySelectorAll(".tab").forEach((b) => b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("on", x === b));
-  document.querySelectorAll("main section, section[id^=t-]").forEach((s) => s.classList.toggle("hidden", s.id !== "t-" + b.dataset.t));
+  document.querySelectorAll("section[id^=t-]").forEach((s) => s.classList.toggle("hidden", s.id !== "t-" + b.dataset.t));
 });
-$("#modal").onclick = (e) => { if (e.target.id === "modal") $("#modal").classList.remove("on"); };
+const closeModal = () => $("#modal").classList.remove("on");
+$("#modal").onclick = (e) => { if (e.target.id === "modal") closeModal(); };
 $("#lightbox").onclick = () => $("#lightbox").classList.remove("on");
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("#modal").classList.remove("on"); $("#lightbox").classList.remove("on"); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeModal(); $("#lightbox").classList.remove("on"); } });
+$("#weekPrev").onclick = () => { WEEK = addDays(WEEK, -7); loadWeek(); };
+$("#weekNext").onclick = () => { WEEK = addDays(WEEK, 7); loadWeek(); };
+$("#weekNow").onclick = () => { WEEK = mondayOf(kyivToday()); loadWeek(); };
 
+// ---------- Фільтри ----------
+const PRESETS = [["7d", "Останні 7 днів"], ["today", "Сьогодні"], ["yesterday", "Вчора"], ["week", "Цей тиждень"], ["lastweek", "Минулий тиждень"],
+  ["month", "Цей місяць"], ["lastmonth", "Минулий місяць"], ["30d", "Останні 30 днів"], ["custom", "Свій період"]];
+function presetRange(p) {
+  const t = kyivToday(), mon = mondayOf(t), m1 = t.slice(0, 8) + "01";
+  switch (p) {
+    case "today": return [t, t];
+    case "yesterday": { const y = addDays(t, -1); return [y, y]; }
+    case "week": return [mon, addDays(mon, 6)];
+    case "lastweek": return [addDays(mon, -7), addDays(mon, -1)];
+    case "month": return [m1, monthEnd(m1)];
+    case "lastmonth": { const e = addDays(m1, -1); return [e.slice(0, 8) + "01", e]; }
+    case "30d": return [addDays(t, -29), t];
+    default: return [addDays(t, -6), t];
+  }
+}
+function mountFilter(key, sel, withStaff, onChange) {
+  const [from, to] = presetRange("7d");
+  F[key] = { preset: "7d", from, to, rest: "", staff: "" };
+  const el = $(sel);
+  el.innerHTML = `<select data-k="preset">${PRESETS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
+    <input type="date" data-k="from" value="${from}"> – <input type="date" data-k="to" value="${to}">
+    <select data-k="rest"><option value="">Усі ресторани</option></select>
+    ${withStaff ? `<select data-k="staff"><option value="">Усі співробітники</option></select>` : ""}
+    <button class="btn ghost" data-k="reset" style="padding:6px 10px">Скинути</button>
+    <span class="fcount"></span>`;
+  const q = (k) => el.querySelector(`[data-k=${k}]`);
+  const sync = () => { q("preset").value = F[key].preset; q("from").value = F[key].from; q("to").value = F[key].to; q("rest").value = F[key].rest; if (withStaff) q("staff").value = F[key].staff; };
+  q("preset").onchange = () => { const p = q("preset").value; F[key].preset = p; if (p !== "custom") [F[key].from, F[key].to] = presetRange(p); sync(); onChange(); };
+  for (const k of ["from", "to"]) q(k).onchange = () => {
+    if (!q(k).value) return sync();
+    F[key][k] = q(k).value; F[key].preset = "custom";
+    if (F[key].from > F[key].to) [F[key].from, F[key].to] = [F[key].to, F[key].from];
+    sync(); onChange();
+  };
+  q("rest").onchange = () => { F[key].rest = q("rest").value; onChange(); };
+  if (withStaff) q("staff").onchange = () => { F[key].staff = q("staff").value; onChange(); };
+  q("reset").onclick = () => { const [f, t] = presetRange("7d"); Object.assign(F[key], { preset: "7d", from: f, to: t, rest: "", staff: "" }); sync(); onChange(); };
+}
+function fillFilterOptions() {
+  const ropts = S.restaurants.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
+  const sopts = S.staff.filter((x) => x.full_name).sort((a, b) => a.full_name.localeCompare(b.full_name, "uk"))
+    .map((x) => `<option value="${x.telegram_id}">${esc(x.full_name)}</option>`).join("");
+  for (const [key, sel] of [["ov", "#f-ov"], ["rep", "#f-rep"], ["prob", "#f-prob"]]) {
+    const el = $(sel), r = el.querySelector("[data-k=rest]"), st = el.querySelector("[data-k=staff]");
+    r.innerHTML = `<option value="">Усі ресторани</option>` + ropts; r.value = F[key].rest;
+    if (st) { st.innerHTML = `<option value="">Усі співробітники</option>` + sopts; st.value = F[key].staff; }
+  }
+  const g = $("#itemsRest"), c2 = g.value || String(S.restaurants[0]?.id ?? "");
+  g.innerHTML = ropts; g.value = c2;
+}
+const setCount = (sel, txt) => { $(sel + " .fcount").textContent = txt; };
+
+// ---------- Завантаження ----------
+function fail(res) {
+  const e = res.find((x) => x.error);
+  if (e) alert("Помилка завантаження: " + e.error.message + "\nПеревір, що твій email додано в dashboard_admins.");
+  return !!e;
+}
+const cache = (rows) => { for (const r of rows) SUBS[r.id] = r; return rows; };
+function subsQ(f) {
+  let q = sb.from("v_submissions").select("*").gte("work_date", f.from).lte("work_date", f.to).order("started_at", { ascending: false }).limit(2000);
+  if (f.rest) q = q.eq("restaurant_id", f.rest);
+  if (f.staff) q = q.eq("telegram_id", f.staff);
+  return q;
+}
+function probsQ(f) {
+  let q = sb.from("answers").select("id,question,section,value_bool,value_number,value_text,comment,photo_path,answered_at,is_problem,submission_id,submissions!inner(id,work_date,restaurant_id,staff_name,telegram_id)")
+    .eq("is_problem", true).gte("submissions.work_date", f.from).lte("submissions.work_date", f.to).order("answered_at", { ascending: false }).limit(2000);
+  if (f.rest) q = q.eq("submissions.restaurant_id", f.rest);
+  if (f.staff) q = q.eq("submissions.telegram_id", f.staff);
+  return q;
+}
 async function loadAll() {
-  const from = $("#dFrom").value, to = $("#dTo").value, rid = $("#fRest").value;
-  let qs = sb.from("v_submissions").select("*").gte("work_date", from).lte("work_date", to).order("started_at", { ascending: false });
-  let qp = sb.from("answers").select("id,question,section,value_bool,value_number,value_text,comment,photo_path,answered_at,submission_id,submissions!inner(work_date,restaurant_id,staff_name)")
-    .eq("is_problem", true).gte("submissions.work_date", from).lte("submissions.work_date", to).order("answered_at", { ascending: false });
-  if (rid) { qs = qs.eq("restaurant_id", rid); qp = qp.eq("submissions.restaurant_id", rid); }
-  const [r, s, p, st, it, sr] = await Promise.all([
-    sb.from("restaurants").select("*").order("name"), qs, qp,
+  if (!(await loadRef())) return;
+  await Promise.all([loadOverview(), loadWeek(), loadReports(), loadProblems()]);
+}
+async function loadRef() {
+  const res = await Promise.all([
+    sb.from("restaurants").select("*").order("name"),
     sb.from("staff").select("*").order("created_at", { ascending: false }),
     sb.from("checklist_items").select("*").order("position").order("id"),
     sb.from("staff_restaurants").select("*"),
   ]);
-  const err = [r, s, p, st, it, sr].find((x) => x.error);
-  if (err) { alert("Помилка завантаження: " + err.error.message + "\nПеревір, що твій email додано в dashboard_admins."); return; }
-  S = { restaurants: r.data, subs: s.data, problems: p.data, staff: st.data, items: it.data, links: sr.data };
-  fillRestSelects();
-  renderOverview(); renderReports(); renderProblems(); renderStaff(); renderItems(); renderRests();
+  if (fail(res)) return false;
+  const [r, st, it, sr] = res;
+  S = { restaurants: r.data, staff: st.data, items: it.data, links: sr.data };
+  fillFilterOptions(); renderStaff(); renderItems(); renderRests();
+  return true;
+}
+async function loadOverview() {
+  const res = await Promise.all([subsQ(F.ov), probsQ(F.ov)]);
+  if (fail(res)) return;
+  renderOverview(cache(res[0].data), res[1].data);
+}
+async function loadWeek() {
+  const res = await subsQ({ from: WEEK, to: addDays(WEEK, 6), rest: F.ov.rest });
+  if (fail([res])) return;
+  renderWeek(cache(res.data));
+}
+async function loadReports() {
+  const res = await subsQ(F.rep);
+  if (fail([res])) return;
+  renderReports(cache(res.data));
+}
+async function loadProblems() {
+  const res = await probsQ(F.prob);
+  if (fail([res])) return;
+  renderProblems(res.data);
 }
 
 const restName = (id) => S.restaurants.find((r) => r.id === id)?.name ?? "—";
-function fillRestSelects() {
-  const opts = S.restaurants.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
-  const f = $("#fRest"), cur = f.value; f.innerHTML = `<option value="">Усі ресторани</option>` + opts; f.value = cur;
-  const g = $("#itemsRest"), c2 = g.value || f.value || String(S.restaurants[0]?.id ?? "");
-  g.innerHTML = opts; g.value = c2;
+const activeRests = (rid) => S.restaurants.filter((r) => r.active && (!rid || String(r.id) === String(rid)));
+// перше завершене відкриття на ресторан/день + ті, що в процесі
+function openings(subs) {
+  const byKey = {}, wip = {};
+  for (const x of subs.filter((x) => x.status === "completed").sort((a, b) => a.completed_at.localeCompare(b.completed_at))) byKey[x.restaurant_id + "|" + x.work_date] ||= x;
+  for (const x of subs.filter((x) => x.status === "in_progress")) wip[x.restaurant_id + "|" + x.work_date] = x;
+  return { byKey, wip };
 }
 
 // ---------- Огляд ----------
-function renderOverview() {
-  const from = $("#dFrom").value, to = $("#dTo").value, rid = $("#fRest").value, today = kyivToday();
-  const rests = S.restaurants.filter((r) => r.active && (!rid || String(r.id) === rid));
+function renderOverview(subs, probs) {
+  const { from, to, rest } = F.ov, today = kyivToday();
+  const rests = activeRests(rest);
   const days = dayRange(from, to);
-  const done = S.subs.filter((x) => x.status === "completed");
-  // перше завершене відкриття на ресторан/день
-  const byKey = {};
-  for (const x of [...done].sort((a, b) => a.completed_at.localeCompare(b.completed_at))) byKey[x.restaurant_id + "|" + x.work_date] ||= x;
-  const wip = {};
-  for (const x of S.subs.filter((x) => x.status === "in_progress")) wip[x.restaurant_id + "|" + x.work_date] = x;
-  const firsts = Object.values(byKey);
+  const firsts = Object.values(openings(subs).byKey);
   const expected = rests.length * days.filter((d) => d <= today).length;
   const onTime = firsts.filter((x) => !x.is_late).length;
-  const probs = firsts.reduce((a, x) => a + x.problems_cnt, 0);
+  const nProbs = firsts.reduce((a, x) => a + x.problems_cnt, 0);
   const dur = firsts.length ? firsts.reduce((a, x) => a + Number(x.duration_min || 0), 0) / firsts.length : 0;
-  const pct = (a, b) => b ? Math.round(a / b * 100) + "%" : "—";
   $("#kpis").innerHTML = [
     ["Відкриттів заповнено", `${firsts.length}<span class="muted" style="font-size:16px"> / ${expected}</span>`, pct(firsts.length, expected) + " від очікуваних"],
     ["Вчасно", pct(onTime, firsts.length), `${firsts.length - onTime} із запізненням`],
-    ["Проблем зафіксовано", probs, firsts.length ? (probs / firsts.length).toFixed(1) + " на відкриття" : ""],
+    ["Проблем зафіксовано", nProbs, firsts.length ? (nProbs / firsts.length).toFixed(1) + " на відкриття" : ""],
     ["Сер. тривалість", firsts.length ? Math.round(dur) + " хв" : "—", "від старту до завершення"],
   ].map(([l, v, s]) => `<div class="card kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="l">${s}</div></div>`).join("");
+  setCount("#f-ov", `${fmtD(from)} – ${fmtD(to)}`);
 
-  // матриця
-  let h = `<table class="matrix"><tr><th class="r"></th>${days.map((d) => { const w = new Date(d + "T12:00:00Z").getUTCDay(); return `<th class="muted" style="font-size:11px">${WD[w]}<br>${d.slice(8)}.${d.slice(5, 7)}</th>`; }).join("")}</tr>`;
-  for (const r of rests) {
-    h += `<tr><td class="r">${esc(r.name)}</td>`;
-    for (const d of days) {
-      const x = byKey[r.id + "|" + d], w = wip[r.id + "|" + d];
-      if (x) h += `<td><div class="cell ${x.is_late ? "late" : "ok"}" data-sub="${x.id}" title="${esc(x.staff_name)} · ${fmtT(x.completed_at)}">${x.problems_cnt || "✓"}</div></td>`;
-      else if (w) h += `<td><div class="cell wip" data-sub="${w.id}" title="В процесі: ${esc(w.staff_name)}">…</div></td>`;
-      else if (d > today) h += `<td><div class="cell fut"></div></td>`;
-      else h += `<td><div class="cell miss" title="Не заповнено">—</div></td>`;
-    }
-    h += "</tr>";
-  }
-  $("#matrix").innerHTML = rests.length ? h + "</table>" : `<div class="empty">Немає ресторанів</div>`;
-  $("#matrix").querySelectorAll("[data-sub]").forEach((el) => el.onclick = () => openSub(el.dataset.sub));
-
-  // топ проблем
   const cnt = {};
-  for (const p of S.problems) cnt[p.question] = (cnt[p.question] || 0) + 1;
+  for (const p of probs) cnt[p.question] = (cnt[p.question] || 0) + 1;
   const top = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 8), mx = top[0]?.[1] || 1;
   $("#topProblems").innerHTML = top.length ? top.map(([q, n]) => `<div style="margin-bottom:10px"><div class="row" style="justify-content:space-between"><span>${esc(q)}</span><b>${n}</b></div><div class="bar"><div style="width:${n / mx * 100}%"></div></div></div>`).join("") : `<div class="empty">Проблем немає 🎉</div>`;
 
-  // по ресторанах
   const elapsed = days.filter((d) => d <= today).length;
   const rows = rests.map((r) => {
     const f = firsts.filter((x) => x.restaurant_id === r.id);
@@ -318,12 +440,35 @@ function renderOverview() {
   $("#byRest").innerHTML = `<table><tr><th>Ресторан</th><th class="num">Заповнено</th><th class="num">Покриття</th><th class="num">Вчасно</th><th class="num">Проблем</th><th class="num">Сер. час</th><th>Вікно</th></tr>${rows}</table>`;
 }
 
+function renderWeek(subs) {
+  const today = kyivToday(), days = dayRange(WEEK, addDays(WEEK, 6));
+  const isNow = WEEK === mondayOf(today);
+  $("#weekLabel").textContent = `${fmtD(WEEK).slice(0, 5)} – ${fmtD(days[6])}`;
+  $("#weekNow").classList.toggle("hidden", isNow);
+  const { byKey, wip } = openings(subs), rests = activeRests(F.ov.rest);
+  let h = `<table class="matrix"><tr><th class="r"></th>${days.map((d, i) => `<th class="muted ${d === today ? "today" : ""}" style="font-size:11px">${WD[(i + 1) % 7]}<br>${d.slice(8)}.${d.slice(5, 7)}</th>`).join("")}</tr>`;
+  for (const r of rests) {
+    h += `<tr><td class="r">${esc(r.name)}</td>`;
+    for (const d of days) {
+      const x = byKey[r.id + "|" + d], w = wip[r.id + "|" + d];
+      if (x) h += `<td><div class="cell ${x.is_late ? "late" : "ok"}" data-sub="${x.id}" title="${esc(x.staff_name)} · ${fmtT(x.completed_at)}">${x.problems_cnt || "✓"}</div></td>`;
+      else if (w) h += `<td><div class="cell wip" data-sub="${w.id}" title="В процесі: ${esc(w.staff_name)}">…</div></td>`;
+      else if (d > today) h += `<td><div class="cell fut" title="Ще не настав"></div></td>`;
+      else h += `<td><div class="cell miss" title="Не заповнено">—</div></td>`;
+    }
+    h += "</tr>";
+  }
+  $("#matrix").innerHTML = rests.length ? h + "</table>" : `<div class="empty">Немає ресторанів</div>`;
+  $("#matrix").querySelectorAll("[data-sub]").forEach((el) => el.onclick = () => openSub(el.dataset.sub));
+}
+
 // ---------- Звіти ----------
-function renderReports() {
-  if (!S.subs.length) return $("#reportsTable").innerHTML = `<div class="empty">Немає звітів за період</div>`;
-  const st = (x) => x.status === "completed" ? `<span class="pill ${x.is_late ? "late" : "ok"}">${x.is_late ? "запізнення" : "вчасно"}</span>` : x.status === "in_progress" ? `<span class="pill mute">в процесі</span>` : `<span class="pill mute">скасовано</span>`;
+const statusPill = (x) => x.status === "completed" ? `<span class="pill ${x.is_late ? "late" : "ok"}">${x.is_late ? "запізнення" : "вчасно"}</span>` : x.status === "in_progress" ? `<span class="pill mute">в процесі</span>` : `<span class="pill mute">скасовано</span>`;
+function renderReports(subs) {
+  setCount("#f-rep", plural(subs.length, "звіт", "звіти", "звітів"));
+  if (!subs.length) return $("#reportsTable").innerHTML = `<div class="empty">Немає звітів за вибраними фільтрами</div>`;
   $("#reportsTable").innerHTML = `<table><tr><th>Дата</th><th>Ресторан</th><th>Працівник</th><th>Старт</th><th>Фініш</th><th class="num">Хв</th><th class="num">Проблем</th><th class="num">Фото</th><th>Статус</th></tr>${
-    S.subs.map((x) => `<tr class="click" data-sub="${x.id}"><td>${fmtD(x.work_date)}</td><td>${esc(x.restaurant)}</td><td>${esc(x.staff_name)}</td><td>${fmtT(x.started_at)}</td><td>${fmtT(x.completed_at)}</td><td class="num">${x.duration_min ?? "—"}</td><td class="num">${x.problems_cnt ? `<span class="pill bad">${x.problems_cnt}</span>` : "0"}</td><td class="num">${x.photos_cnt}</td><td>${st(x)}</td></tr>`).join("")}</table>`;
+    subs.map((x) => `<tr class="click" data-sub="${x.id}"><td>${fmtD(x.work_date)}</td><td>${esc(x.restaurant)}</td><td>${esc(x.staff_name)}</td><td>${fmtT(x.started_at)}</td><td>${fmtT(x.completed_at)}</td><td class="num">${x.duration_min ?? "—"}</td><td class="num">${x.problems_cnt ? `<span class="pill bad">${x.problems_cnt}</span>` : "0"}</td><td class="num">${x.photos_cnt}</td><td>${statusPill(x)}</td></tr>`).join("")}</table>`;
   $("#reportsTable").querySelectorAll("[data-sub]").forEach((el) => el.onclick = () => openSub(el.dataset.sub));
 }
 
@@ -336,27 +481,65 @@ const valueOf = (a) => a.value_bool === true ? `<span class="pill ok">Так</sp
   : a.value_number !== null && a.value_number !== undefined ? `<b class="${a.is_problem ? "pill bad" : ""}">${a.value_number}</b>` : a.value_text ? esc(a.value_text) : "";
 
 async function openSub(id) {
-  const x = S.subs.find((s) => s.id === id);
   $("#modalBody").innerHTML = `<div class="empty">Завантаження…</div>`; $("#modal").classList.add("on");
+  let x = SUBS[id];
+  if (!x) { const { data } = await sb.from("v_submissions").select("*").eq("id", id).maybeSingle(); if (data) x = SUBS[id] = data; }
   const { data: ans, error } = await sb.from("answers").select("*").eq("submission_id", id).order("answered_at");
-  if (error) return $("#modalBody").innerHTML = `<div class="err">${esc(error.message)}</div>`;
+  if (error || !x) return $("#modalBody").innerHTML = `<div class="err">${esc(error?.message ?? "Звіт не знайдено")}</div>`;
   const urls = await signed(ans.map((a) => a.photo_path));
   let sec = "", body = "";
   for (const a of ans) {
     if (a.section !== sec) { sec = a.section; body += `<div class="sec">${esc(sec)}</div>`; }
     body += `<div class="ans"><div class="q">${esc(a.question)}</div><div>${valueOf(a)}</div>${a.comment ? `<div class="c">↳ ${esc(a.comment)}</div>` : ""}${a.photo_path && urls[a.photo_path] ? `<div class="c"><img class="thumb" src="${urls[a.photo_path]}" alt=""></div>` : ""}</div>`;
   }
-  $("#modalBody").innerHTML = `<div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${esc(x?.restaurant ?? "")} · ${fmtD(x?.work_date)}</h3><div class="muted">${esc(x?.staff_name)} · ${fmtT(x?.started_at)}–${fmtT(x?.completed_at)}${x?.duration_min ? ` · ${x.duration_min} хв` : ""} · проблем: ${x?.problems_cnt ?? 0}</div></div><button class="btn ghost" onclick="$('#modal').classList.remove('on')">✕</button></div>${body || `<div class="empty">Відповідей ще немає</div>`}`;
+  const now = new Date().toLocaleString("uk-UA", { timeZone: "Europe/Kyiv", hour12: false, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  $("#modalBody").innerHTML = `
+    <div class="print-only print-head"><div class="logo">23<span class="dot"></span> чек-листи</div><div class="muted" style="font-size:11px">Сформовано ${now}</div></div>
+    <div class="row" style="justify-content:space-between;align-items:flex-start">
+      <h3>Чек-лист відкриття · ${esc(x.restaurant)}</h3>
+      <div class="row no-print"><button class="btn ghost" id="printBtn">🖨 Друк / PDF</button><button class="btn ghost" id="closeBtn" title="Закрити">✕</button></div>
+    </div>
+    <div class="meta">
+      <div><span class="k">Дата</span><b>${fmtD(x.work_date)}</b></div>
+      <div><span class="k">Працівник</span><b>${esc(x.staff_name)}</b></div>
+      <div><span class="k">Час</span><b>${fmtT(x.started_at)}–${fmtT(x.completed_at)}</b>${x.duration_min ? ` <span class="muted">· ${Math.round(x.duration_min)} хв</span>` : ""}</div>
+      <div><span class="k">Статус</span>${statusPill(x)}</div>
+      <div><span class="k">Проблем</span><b>${x.problems_cnt ?? 0}</b></div>
+      <div><span class="k">Фото</span><b>${x.photos_cnt ?? 0}</b></div>
+    </div>
+    ${body || `<div class="empty">Відповідей ще немає</div>`}`;
+  $("#closeBtn").onclick = closeModal;
+  $("#printBtn").onclick = () => printReport(x);
   bindThumbs($("#modalBody"));
 }
 function bindThumbs(root) { root.querySelectorAll(".thumb").forEach((img) => img.onclick = (e) => { e.stopPropagation(); $("#lbImg").src = img.src; $("#lightbox").classList.add("on"); }); }
 
+// Друк / збереження в PDF (через діалог друку браузера)
+let savedTitle = null;
+async function printReport(x) {
+  const btn = $("#printBtn"); btn.disabled = true; btn.textContent = "Готую…";
+  const imgs = [...$("#modalBody").querySelectorAll("img")];
+  await Promise.race([
+    Promise.all(imgs.map((i) => i.complete ? 0 : new Promise((r) => { i.addEventListener("load", r, { once: true }); i.addEventListener("error", r, { once: true }); }))),
+    new Promise((r) => setTimeout(r, 8000)),
+  ]);
+  btn.disabled = false; btn.textContent = "🖨 Друк / PDF";
+  savedTitle = document.title;
+  document.title = `Чек-лист ${x.restaurant} ${fmtD(x.work_date)}`.replace(/[\\/:*?"<>|]/g, "-");
+  document.body.classList.add("printing");
+  window.print();
+}
+addEventListener("beforeprint", () => { if ($("#modal").classList.contains("on")) document.body.classList.add("printing"); });
+addEventListener("afterprint", () => { document.body.classList.remove("printing"); if (savedTitle) { document.title = savedTitle; savedTitle = null; } });
+
 // ---------- Проблеми ----------
-async function renderProblems() {
-  if (!S.problems.length) return $("#problemsTable").innerHTML = `<div class="empty">Проблем за період немає 🎉</div>`;
-  const urls = await signed(S.problems.map((p) => p.photo_path));
+async function renderProblems(probs) {
+  setCount("#f-prob", plural(probs.length, "проблема", "проблеми", "проблем"));
+  if (!probs.length) return $("#problemsTable").innerHTML = `<div class="empty">Проблем за вибраними фільтрами немає 🎉</div>`;
+  const urls = await signed(probs.map((p) => p.photo_path));
   $("#problemsTable").innerHTML = `<table><tr><th>Дата</th><th>Ресторан</th><th>Пункт</th><th>Відповідь</th><th>Коментар</th><th>Фото</th><th>Хто</th></tr>${
-    S.problems.map((p) => `<tr><td>${fmtD(p.submissions.work_date)}<br><span class="muted">${fmtT(p.answered_at)}</span></td><td>${esc(restName(p.submissions.restaurant_id))}</td><td>${esc(p.question)}</td><td>${valueOf(p)}</td><td>${esc(p.comment)}</td><td>${p.photo_path && urls[p.photo_path] ? `<img class="thumb" src="${urls[p.photo_path]}" alt="">` : ""}</td><td>${esc(p.submissions.staff_name)}</td></tr>`).join("")}</table>`;
+    probs.map((p) => `<tr class="click" data-sub="${p.submission_id}" title="Відкрити звіт"><td>${fmtD(p.submissions.work_date)}<br><span class="muted">${fmtT(p.answered_at)}</span></td><td>${esc(restName(p.submissions.restaurant_id))}</td><td>${esc(p.question)}</td><td>${valueOf(p)}</td><td>${esc(p.comment)}</td><td>${p.photo_path && urls[p.photo_path] ? `<img class="thumb" src="${urls[p.photo_path]}" alt="">` : ""}</td><td>${esc(p.submissions.staff_name)}</td></tr>`).join("")}</table>`;
+  $("#problemsTable").querySelectorAll("[data-sub]").forEach((el) => el.onclick = () => openSub(el.dataset.sub));
   bindThumbs($("#problemsTable"));
 }
 
